@@ -24,10 +24,11 @@ const main: Main = async (args) => {
 }
 
 const shellIntegrate: ShellIntegrate = async (shell) => {
+    const dir = import.meta.dir
     if (shell === "fish") {
         const script = `function qwq
     printf "在想呢……"
-    cd ~/Documents/Projects/qwq
+    cd ${dir}
     set -l answer (bun --silent start ask $argv | string collect)
     set -l command (bun --silent start extract-cmd $answer | string collect)
     if [ $command != "" ]
