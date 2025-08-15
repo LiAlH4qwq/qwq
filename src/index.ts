@@ -1,0 +1,146 @@
+import * as yaml from "yaml"
+import * as types from "types"
+import { resolve } from "bun"
+
+type Main = (args: string[]) => Promise<never>
+type ShellIntegrate = (shell: string) => Promise<void>
+type ExtractCommand = (answer: string) => Promise<void>
+type LoadConfig = () => Promise<types.Config>
+type Ask = (question: string) => Promise<void>
+type AskDebug = (question: string) => Promise<void>
+type AskAi = (question: string, configApi: types.ConfigApi) => Promise<void>
+type BuildRequest = (question: string, configApi: types.ConfigApi) => Promise<types.Request>
+type BuildRequestBody = (question: string, model: string) => Promise<types.RequestBoby>
+type BuildMessages = (question: string) => Promise<types.Message[]>
+
+const main: Main = async (args) => {
+    const command = args.at(0)
+    const text = args.slice(1).join(" ").replaceAll("\\n", "\n")
+    if (command === "ask") await ask(text)
+    else if (command === "extract-cmd") await extractCommand(text)
+    else if (command === "integrate-shell") await shellIntegrate(args.length >= 2 ? args.at(1).trim() : "<undefined>")
+    process.exit()
+}
+
+const shellIntegrate: ShellIntegrate = async (shell) => {
+    if (shell === "fish") {
+        const script = `function qwq
+    printf "在想呢……"
+    cd ~/Documents/Projects/qwq
+    set -l answer (bun --silent start ask $argv | string collect)
+    set -l command (bun --silent start extract-cmd $answer | string collect)
+    if [ $command != "" ]
+        set -l answerText (string split -rm 1 \\n"QWQ COMMAND BEGIN" $answer)[1]
+        printf "\\n"
+        printf "%s\\n" $answerText
+        printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\n"
+        printf "$command\\n"
+        read -lP "你的选择：" confirm
+        while true
+            switch $confirm
+                case "y" "yes" "Y" "Yes" "YES"
+                    printf "好耶！\\n"
+                    printf "$command\\n" | source
+                    break
+                case "n" "no" "N" "No" "NO"
+                    printf "指令没有执行哦~\\n"
+                    break
+                case "*"
+                    printf "我不太能看懂你的选择呢……\\n"
+            end
+        end
+    else
+        printf "\\n"
+        printf "%s\\n" $answer
+    end
+end`
+        console.log(script)
+    } else {
+        const message = `暂时不支持${shell}喵`
+        console.log(message)
+    }
+}
+
+const extractCommand: ExtractCommand = async (answer) => {
+    if (!(answer.includes("QWQ COMMAND BEGIN") && answer.includes("QWQ COMMAND END"))) {
+        console.log("")
+    } else {
+        const afterBeginId = answer.split("QWQ COMMAND BEGIN").at(-1)
+        const command = afterBeginId.split("QWQ COMMAND END").at(0).trim()
+        console.log(command)
+    }
+}
+
+const loadConfig: LoadConfig = async () => {
+    const configFile = Bun.file("./config.yaml")
+    const config = yaml.parse(await configFile.text()) as types.Config
+    return config
+}
+
+const ask: Ask = async (question) => {
+    const config = await loadConfig()
+    if (config.debug) await askDebug(question)
+    else await askAi(question, config.api)
+}
+
+const askDebug: AskDebug = async (question) => {
+    const dummyAnswer = `现在是调试模式喵~
+就是……不会真正向AI提问的
+你提出的问题是：${question}
+我在调试模式下回答不了呢
+把配置文件里的debug改成false就能关掉调试模式了喵
+下面是一条指令建议的实例，用于测试shell集成是否正常喵
+QWQ COMMAND BEGIN
+uname -a
+ls /
+cat /etc/os-release
+QWQ COMMAND END`
+    await new Promise(resolve => setTimeout(() => resolve(null), 3000))
+    console.log(dummyAnswer)
+}
+
+const askAi: AskAi = async (question, configApi) => {
+    const request = await buildRequest(question, configApi)
+    const response = await fetch(configApi.url, request)
+    const result = await response.json() as types.ResponseResult
+    console.log(result.content.at(0).text)
+}
+
+const buildRequest: BuildRequest = async (question, configApi) => {
+    const headers = new Headers()
+    headers.append("Authorization", `Bearer ${configApi.key}`)
+    headers.append("Content-Type", "application/json")
+    const body = await buildRequestBody(question, configApi.model)
+    const request = {
+        method: "POST" as "POST",
+        headers: headers,
+        body: JSON.stringify(body)
+    }
+    return request
+}
+
+const buildRequestBody: BuildRequestBody = async (question, model) => {
+    const messages = await buildMessages(question)
+    const body = {
+        model: model,
+        messages: messages
+    }
+    return body
+}
+
+const buildMessages: BuildMessages = async (question) => {
+    const systemPromptFile = Bun.file("./system-prompt.txt")
+    const systemPrompt = await systemPromptFile.text()
+    const systemMessage = {
+        role: "system" as "system",
+        content: systemPrompt
+    }
+    const questionMessage = {
+        role: "user" as "user",
+        content: question
+    }
+    const messages = [systemMessage, questionMessage]
+    return messages
+}
+
+if (import.meta.path === Bun.main) main(Bun.argv.slice(2))
