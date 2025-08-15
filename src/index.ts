@@ -1,6 +1,5 @@
 import * as yaml from "yaml"
 import * as types from "types"
-import { resolve } from "bun"
 
 type Main = (args: string[]) => Promise<never>
 type ShellIntegrate = (shell: string) => Promise<void>
@@ -8,10 +7,12 @@ type ExtractCommand = (answer: string) => Promise<void>
 type LoadConfig = () => Promise<types.Config>
 type Ask = (question: string) => Promise<void>
 type AskDebug = (question: string) => Promise<void>
-type AskAi = (question: string, configApi: types.ConfigApi) => Promise<void>
-type BuildRequest = (question: string, configApi: types.ConfigApi) => Promise<types.Request>
-type BuildRequestBody = (question: string, model: string) => Promise<types.RequestBoby>
-type BuildMessages = (question: string) => Promise<types.Message[]>
+type AskAi = (question: string, config: types.Config) => Promise<void>
+type BuildRequest = (question: string, config: types.Config) => Promise<types.Request>
+type BuildRequestBody = (question: string, config: types.Config) => Promise<types.RequestBoby>
+type BuildMessages = (question: string, config: types.Config) => Promise<types.Message[]>
+type BuildSystemPrompt = (config: types.Config) => Promise<string>
+type GetEnvVars = (config: types.Config) => Promise<string>
 
 const main: Main = async (args) => {
     const command = args.at(0)
@@ -35,8 +36,8 @@ const shellIntegrate: ShellIntegrate = async (shell) => {
         printf "%s\\n" $answerText
         printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\n"
         printf "$command\\n"
-        read -lP "你的选择：" confirm
         while true
+            read -lP "你的选择：" confirm
             switch $confirm
                 case "y" "yes" "Y" "Yes" "YES"
                     printf "好耶！\\n"
@@ -53,6 +54,7 @@ const shellIntegrate: ShellIntegrate = async (shell) => {
         printf "\\n"
         printf "%s\\n" $answer
     end
+    prevd
 end`
         console.log(script)
     } else {
@@ -80,7 +82,7 @@ const loadConfig: LoadConfig = async () => {
 const ask: Ask = async (question) => {
     const config = await loadConfig()
     if (config.debug) await askDebug(question)
-    else await askAi(question, config.api)
+    else await askAi(question, config)
 }
 
 const askDebug: AskDebug = async (question) => {
@@ -99,18 +101,18 @@ QWQ COMMAND END`
     console.log(dummyAnswer)
 }
 
-const askAi: AskAi = async (question, configApi) => {
-    const request = await buildRequest(question, configApi)
-    const response = await fetch(configApi.url, request)
+const askAi: AskAi = async (question, config) => {
+    const request = await buildRequest(question, config)
+    const response = await fetch(config.api.url, request)
     const result = await response.json() as types.ResponseResult
     console.log(result.content.at(0).text)
 }
 
-const buildRequest: BuildRequest = async (question, configApi) => {
+const buildRequest: BuildRequest = async (question, config) => {
     const headers = new Headers()
-    headers.append("Authorization", `Bearer ${configApi.key}`)
+    headers.append("Authorization", `Bearer ${config.api.key}`)
     headers.append("Content-Type", "application/json")
-    const body = await buildRequestBody(question, configApi.model)
+    const body = await buildRequestBody(question, config)
     const request = {
         method: "POST" as "POST",
         headers: headers,
@@ -119,18 +121,17 @@ const buildRequest: BuildRequest = async (question, configApi) => {
     return request
 }
 
-const buildRequestBody: BuildRequestBody = async (question, model) => {
-    const messages = await buildMessages(question)
+const buildRequestBody: BuildRequestBody = async (question, config) => {
+    const messages = await buildMessages(question, config)
     const body = {
-        model: model,
+        model: config.api.model,
         messages: messages
     }
     return body
 }
 
-const buildMessages: BuildMessages = async (question) => {
-    const systemPromptFile = Bun.file("./system-prompt.txt")
-    const systemPrompt = await systemPromptFile.text()
+const buildMessages: BuildMessages = async (question, config) => {
+    const systemPrompt = await buildSystemPrompt(config)
     const systemMessage = {
         role: "system" as "system",
         content: systemPrompt
@@ -141,6 +142,23 @@ const buildMessages: BuildMessages = async (question) => {
     }
     const messages = [systemMessage, questionMessage]
     return messages
+}
+
+const buildSystemPrompt: BuildSystemPrompt = async (config) => {
+    const systemPromptFile = Bun.file("./system-prompt.txt")
+    const rawSystemPrompt = await systemPromptFile.text()
+    const envVars = await getEnvVars(config)
+    const systemPrompt = `${rawSystemPrompt}\n以下是用户提供给你的一些环境变量，请在回答前参考，如根据用户所用的Shell来推荐正确的指令：\n${envVars}`
+    return systemPrompt
+}
+
+const getEnvVars: GetEnvVars = async (config) => {
+    const envVars = config.env_access.env_vars.map(envVar => {
+        const value = Bun.env[envVar]
+        if (value === undefined) return `${envVar}: <undefined>`
+        return `${envVar}: ${value}`
+    }).join("\n")
+    return envVars
 }
 
 if (import.meta.path === Bun.main) main(Bun.argv.slice(2))

@@ -1,6 +1,7 @@
 export interface Config {
     debug: boolean
     api: ConfigApi
+    env_access: ConfigEnvAccess
 }
 
 export interface ConfigApi {
@@ -8,6 +9,10 @@ export interface ConfigApi {
     url: string
     key: string
     model: string
+}
+
+export interface ConfigEnvAccess {
+    env_vars: string[]
 }
 
 export interface Request {
