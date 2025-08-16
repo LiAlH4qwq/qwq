@@ -32,15 +32,34 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
 ### 从源码安装
 
-1. 安装 bun，可参考 [官网首页](https://bun.sh/)
-1. 克隆项目
+#### 安装 bun
 
-    > git clone <https://github.com/lialh4qwq/qwq>
-    > cd qwq
+可参考 [官网首页](https://bun.sh/)
 
-1. 启用 shell 集成（暂时只支持 fish shell 哦）
+#### 克隆项目
 
-    > bun start integrate-shell fish > ~/.config/fish/conf.d/qwq.fish
+> git clone <https://github.com/lialh4qwq/qwq>
+> cd qwq
+
+#### 启用 shell 集成
+
+##### Fish Shell
+
+> bun start integrate-shell fish > ~/.config/fish/conf.d/qwq.fish
+
+##### Powershell
+
+###### Linux
+
+> mkdir ~/.config/powershell
+
+> bun start integrate-shell powershell > ~/.config/powershell/Microsoft.PowerShell_profile.ps1
+
+##### Windows
+
+运行以下指令并粘贴输出到 Profile 中
+
+> bun start integrate-shell powershell
 
 ### 二进制安装
 
