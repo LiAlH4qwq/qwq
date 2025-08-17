@@ -13,7 +13,7 @@ type BuildRequest = (question: string, config: types.Config) => Promise<types.Re
 type BuildRequestBody = (question: string, config: types.Config) => Promise<types.RequestBoby>
 type BuildMessages = (question: string, config: types.Config) => Promise<types.Message[]>
 type BuildSystemPrompt = (config: types.Config) => Promise<string>
-type GetEnvVars = (config: types.Config) => Promise<string>
+type GetEnvVarsPart = (config: types.Config) => Promise<string>
 
 const main: Main = async (args) => {
     const command = args.at(0)
@@ -113,20 +113,18 @@ const buildMessages: BuildMessages = async (question, config) => {
 }
 
 const buildSystemPrompt: BuildSystemPrompt = async (config) => {
-    const systemPromptFile = Bun.file("./system-prompt.txt")
-    const rawSystemPrompt = await systemPromptFile.text()
-    const envVars = await getEnvVars(config)
-    const systemPrompt = `${rawSystemPrompt}\n以下是用户提供给你的一些环境变量，请在回答前参考，如根据用户所用的Shell来推荐正确的指令：\n${envVars}`
+    const envVarsPart = await getEnvVarsPart(config)
+    const systemPrompt = templetes.buildSystemPromptString(envVarsPart)
     return systemPrompt
 }
 
-const getEnvVars: GetEnvVars = async (config) => {
-    const envVars = config.env_access.env_vars.map(envVar => {
+const getEnvVarsPart: GetEnvVarsPart = async (config) => {
+    const envVarsPart = config.env_access.env_vars.map(envVar => {
         const value = Bun.env[envVar]
         if (value === undefined) return `${envVar}: <undefined>`
         return `${envVar}: ${value}`
     }).join("\n")
-    return envVars
+    return envVarsPart
 }
 
 if (import.meta.path === Bun.main) main(Bun.argv.slice(2))
