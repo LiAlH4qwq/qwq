@@ -17,6 +17,26 @@ jobs:
       - run: bun pack
       - uses: actions/upload-artifact@v4
         with:
-          name: executable
-          path: target
+          name: qwq-linux-x64
+          path: target/qwq-linux-x64
+          compression-level: 9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwq-linux-arm64
+          path: target/qwq-linux-arm64
+          compression-level: 9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwq-darwin-x64
+          path: target/qwq-darwin-x64.app
+          compression-level: 9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwq-darwin-arm64
+          path: target/qwq-darwin-arm64.app
+          compression-level: 9
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qwq-windows-x64
+          path: target/qwq-windows-x64.exe
           compression-level: 9
