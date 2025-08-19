@@ -10,33 +10,78 @@ jobs:
   pack:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - run: mkdir target
-      - run: bun install
-      - run: bun pack
-      - uses: actions/upload-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+      - name: Make target directory
+        run: mkdir target
+      - name: Install dependencies
+        run: bun install
+      - name: Pack into executables
+        run: bun pack
+      - name: Upload linux-x64 executable
+        uses: actions/upload-artifact@v4
         with:
           name: qwq-linux-x64
           path: target/qwq-linux-x64
           compression-level: 9
-      - uses: actions/upload-artifact@v4
+      - name: Upload linux-arm64 executable
+        uses: actions/upload-artifact@v4
         with:
           name: qwq-linux-arm64
           path: target/qwq-linux-arm64
           compression-level: 9
-      - uses: actions/upload-artifact@v4
+      - name: Upload darwin-x64 executable
+        uses: actions/upload-artifact@v4
         with:
           name: qwq-darwin-x64
           path: target/qwq-darwin-x64.app
           compression-level: 9
-      - uses: actions/upload-artifact@v4
+      - name: Upload darwin-arm64 executable
+        uses: actions/upload-artifact@v4
         with:
           name: qwq-darwin-arm64
           path: target/qwq-darwin-arm64.app
           compression-level: 9
-      - uses: actions/upload-artifact@v4
+      - name: Upload windows-x64 executable
+        uses: actions/upload-artifact@v4
         with:
           name: qwq-windows-x64
           path: target/qwq-windows-x64.exe
+          compression-level: 9
+      - name: Upload linux-x64-legacy executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwq-linux-x64-legacy
+          path: target/qwq-linux-x64-legacy
+          compression-level: 9
+      - name: Upload darwin-x64-legacy executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwq-darwin-x64-legacy
+          path: target/qwq-darwin-x64-legacy.app
+          compression-level: 9
+      - name: Upload windows-x64-legacy executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwq-windows-x64-legacy
+          path: target/qwq-windows-x64-legacy.exe
+          compression-level: 9
+      - name: Upload linux-x64-musl executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwq-linux-x64-musl
+          path: target/qwq-linux-x64-musl
+          compression-level: 9
+      - name: Upload linux-arm64-musl executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwq-linux-arm64-musl
+          path: target/qwq-linux-arm64-musl
+      - name: Upload linux-x64-musl-legacy executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwq-linux-x64-musl-legacy
+          path: target/qwq-linux-x64-musl-legacy
           compression-level: 9
