@@ -14,6 +14,9 @@ type BuildRequestBody = (question: string, config: types.Config) => Promise<type
 type BuildMessages = (question: string, config: types.Config) => Promise<types.Message[]>
 type BuildSystemPrompt = (config: types.Config) => Promise<string>
 type GetEnvVarsPart = (config: types.Config) => Promise<string>
+type ParseResponseAnthropic = (result: types.ResponseResultAnthropic) => Promise<string>
+type ParseResponseOpenai = (result: types.ResponseResultOpenai) => Promise<string>
+type ParseResponseText = (rawText: string) => Promise<string>
 
 const main: Main = async (args) => {
     const command = args.at(0)
@@ -32,11 +35,11 @@ const shellIntegrate: ShellIntegrate = async (shell) => {
 }
 
 const extractCommand: ExtractCommand = async (answer) => {
-    if (!(answer.includes("QWQ COMMAND BEGIN") && answer.includes("QWQ COMMAND END"))) {
+    if (!(answer.includes(templetes.qwqCommandBeginId) && answer.includes(templetes.qwqCommandEndId))) {
         console.log("")
     } else {
-        const afterBeginId = answer.split("QWQ COMMAND BEGIN").at(-1)
-        const command = afterBeginId.split("QWQ COMMAND END").at(0).trim()
+        const afterBeginId = answer.split(templetes.qwqCommandBeginId).at(-1)
+        const command = afterBeginId.split(templetes.qwqCommandEndId).at(0).trim()
         console.log(command)
     }
 }
@@ -54,17 +57,7 @@ const ask: Ask = async (question) => {
 }
 
 const askDebug: AskDebug = async (question) => {
-    const dummyAnswer = `现在是调试模式喵~
-就是……不会真正向AI提问的
-你提出的问题是：${question}
-我在调试模式下回答不了呢
-把配置文件里的debug改成false就能关掉调试模式了喵
-下面是一条指令建议的实例，用于测试shell集成是否正常喵
-QWQ COMMAND BEGIN
-uname -a
-ls /
-cat /etc/os-release
-QWQ COMMAND END`
+    const dummyAnswer = templetes.buildDummyAnswer(question)
     await new Promise(resolve => setTimeout(() => resolve(null), 3000))
     console.log(dummyAnswer)
 }
@@ -72,8 +65,18 @@ QWQ COMMAND END`
 const askAi: AskAi = async (question, config) => {
     const request = await buildRequest(question, config)
     const response = await fetch(config.api.url, request)
-    const result = await response.json() as types.ResponseResult
-    console.log(result.content.at(0).text)
+    const result = await response.json()
+    if (config.api.type === "anthropic") {
+        const rawText = await parseResponseAnthropic(result as types.ResponseResultAnthropic)
+        const text = await parseResponseText(rawText)
+        console.log(text)
+    } else if (config.api.type === "openai") {
+        const rawText = await parseResponseOpenai(result as types.ResponseResultOpenai)
+        const text = await parseResponseText(rawText)
+        console.log(text)
+    } else {
+        console.log(`暂时还不支持${config.api.type}这种API喵`)
+    }
 }
 
 const buildRequest: BuildRequest = async (question, config) => {
@@ -125,6 +128,24 @@ const getEnvVarsPart: GetEnvVarsPart = async (config) => {
         return `${envVar}: ${value}`
     }).join("\n")
     return envVarsPart
+}
+
+const parseResponseAnthropic: ParseResponseAnthropic = async (result) => {
+    const text = result.content.at(0).text
+    return text
+}
+
+const parseResponseOpenai: ParseResponseOpenai = async (result) => {
+    const text = result.choices.at(0).message.content
+    return text
+}
+
+const parseResponseText: ParseResponseText = async (rawText) => {
+    const trimmedRawText = rawText.trim()
+    if (trimmedRawText.startsWith(templetes.qwqMetaTerminateId)
+        || trimmedRawText.endsWith(templetes.qwqMetaTerminateId))
+        return templetes.terminateMessage
+    else return trimmedRawText
 }
 
 if (import.meta.path === Bun.main) main(Bun.argv.slice(2))

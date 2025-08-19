@@ -5,7 +5,7 @@ export interface Config {
 }
 
 export interface ConfigApi {
-    type: "anthropic"
+    type: "anthropic" | "openai"
     url: string
     key: string
     model: string
@@ -27,15 +27,23 @@ export interface RequestBoby {
 }
 
 export interface Message {
-    role: "system" | "user"
+    role: "system" | "user" | "assistant"
     content: string
 }
 
-export interface ResponseResult {
-    content: ResponseResultContent[]
+export interface ResponseResultAnthropic {
+    content: ResponseResultContentAnthropic[]
 }
 
-export interface ResponseResultContent {
+export interface ResponseResultContentAnthropic {
     type: "text"
     text: string
+}
+
+export interface ResponseResultOpenai {
+    choices: ResponseResultChoiceOpenai[]
+}
+
+export interface ResponseResultChoiceOpenai {
+    message: Message
 }

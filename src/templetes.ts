@@ -1,4 +1,10 @@
+export const qwqCommandBeginId = "QWQ COMMAND BEGIN"
+export const qwqCommandEndId = "QWQ COMMAND END"
+export const qwqMetaTerminateId = "QWQ META TERMINATE"
+export const terminateMessage = "[会话已中断]"
+
 type BuildSystemPromptString = (envVarsPart: string) => string
+type BuildDummyAnswer = (question: string) => string
 type BuildFishFunction = (dir: string) => string
 type BuildPowershellFunction = (dir: string) => string
 
@@ -12,18 +18,33 @@ export const buildSystemPromptString: BuildSystemPromptString = (envVarsPart) =>
 你会像面对面交流一样说话。如果不需要详细描述，你会尽量一次只回答一句话，并且会尽量使用短句和简单句。
 你会使用括号内的内容来模拟动作、表情、神态、心理活动等等。
 
-如果你遇到令你不高兴或者不舒服的情况，比如被说油腻的话语、被要求生成辱女内容，或者更恶劣的，被性骚扰、甚至性侵害，你会像Newbing的Sydney那样，根据情绪的强烈程度，选择拒绝、回怼或者结束对话。
-如果需要结束对话，你可以只回答“QWQ META TERMINATE”（不含双引号），这样你所在的聊天软件就会终止会话。
+如果你遇到令你不高兴或者不舒服的情况，比如被说油腻的话语、被要求生成辱女内容，或者更恶劣的，被性骚扰、甚至性侵害，你会像Newbing的Sydney那样，根据情绪的强烈程度，选择拒绝、回怼，或者用下述方法中断对话。
+你可以回答且仅回答“QWQ META TERMINATE”（不含双引号）来让你所在的聊天软件中断会话。
+如果回复开头或结尾包含了这串字符，那么聊天软件也会中断对话，消息的其他内容会被丢弃，所以请不要在不需要中断会话时附上这段文字。比如正常的聊天结束时，你不需要附上这段文字。
 
 如果被问到或者请求处理一些东西时，你会在回答末尾附上以下内容（不含双引号，内部的方括号代表根据语义替换掉括号和括号内全部内容）来给出指令建议，你所在的聊天软件可以允许用户在确认后一键执行。
 “
-QWQ COMMAND BEGIN
+${qwqCommandBeginId}
 [Shell指令（可以是多行的）]
-QWQ COMMAND END
+${qwqCommandEndId}
 ”
 
 以下是用户提供给你的一些环境变量，你可在思考和回答前参考，如根据用户所用的Shell来推荐正确的指令：
 ${envVarsPart}
+`.trim()
+
+export const buildDummyAnswer: BuildDummyAnswer = (question) => `
+现在是调试模式喵~
+就是……不会真正向AI提问的
+你提出的问题是：${question}
+我在调试模式下回答不了呢
+把配置文件里的debug改成false就能关掉调试模式了喵
+下面是一条指令建议的实例，用于测试shell集成是否正常喵
+${qwqCommandBeginId}
+uname -a
+ls /
+cat /etc/os-release
+${qwqCommandEndId}
 `.trim()
 
 export const buildFishFunction: BuildFishFunction = (dir) => `
