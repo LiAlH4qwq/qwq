@@ -14,6 +14,7 @@
     "yaml": "^2.8.1"
   },
   "scripts": {
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "pack": "bun build --compile --minify --sourcemap --target=bun-linux-x64-modern --outfile=target/qwq src/index.ts&&bun build --compile --minify --sourcemap --target=bun-windows-x64-modern --outfile=target/qwq.exe src/index.ts"
   }
 }

@@ -1,0 +1,22 @@
+name: Pack
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: mkdir target
+      - run: bun install
+      - run: bun pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: executable
+          path: target
+          compression-level: 9
