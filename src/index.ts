@@ -2,10 +2,9 @@ import * as yaml from "yaml"
 import * as types from "types"
 import * as templetes from "templetes"
 
-type IO<T> = T
-
 type Main = (args: string[]) => Promise<never>
 type ShellIntegrate = (shell: string) => Promise<void>
+type IsRunningFromExecutable = () => Promise<boolean>
 type ExtractCommand = (answer: string) => Promise<void>
 type LoadConfig = () => Promise<types.Config>
 type Ask = (question: string) => Promise<void>
@@ -25,16 +24,18 @@ const main: Main = async (args) => {
     const text = args.slice(1).join(" ").replaceAll("\\n", "\n")
     if (command === "ask") await ask(text)
     else if (command === "extract-cmd") await extractCommand(text)
-    else if (command === "integrate-shell") await shellIntegrate(args.length >= 2 ? args.at(1).trim() : "<undefined>")
+    else if (command === "integrate-shell") await shellIntegrate(args.length >= 2 ? args.at(1).toLowerCase().trim() : "<undefined>")
     process.exit()
 }
 
 const shellIntegrate: ShellIntegrate = async (shell) => {
-    const dir = import.meta.dir
-    if (shell === "fish") console.log(templetes.buildFishFunction(dir))
-    else if (shell === "powershell") console.log(templetes.buildPowershellFunction(dir))
-    else console.log(`暂时还不支持${shell}喵~`)
+    const isExeFile = await isRunningFromExecutable()
+    const path = isExeFile ? process.execPath : import.meta.dir
+    console.log(templetes.buildShellFunction(shell, isExeFile, path))
 }
+
+const isRunningFromExecutable: IsRunningFromExecutable = async () =>
+    Bun.main.startsWith("/$bunfs/root/")
 
 const extractCommand: ExtractCommand = async (answer) => {
     if (!(answer.includes(templetes.qwqCommandBeginId) && answer.includes(templetes.qwqCommandEndId))) {
@@ -47,7 +48,10 @@ const extractCommand: ExtractCommand = async (answer) => {
 }
 
 const loadConfig: LoadConfig = async () => {
-    const configFile = Bun.file("./config.yaml")
+    const configFileDir = isRunningFromExecutable ?
+        process.execPath.split("/")
+            .slice(0, -1).join("/") : "."
+    const configFile = Bun.file(`${configFileDir}/config.yaml`)
     const config = yaml.parse(await configFile.text()) as types.Config
     return config
 }

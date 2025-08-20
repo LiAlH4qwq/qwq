@@ -31,7 +31,7 @@ const targetNameToExecutableName: TargetNameToExecutableName = (target) => {
 }
 
 const main: Main = async () => {
-    await Bun.$`mkdir target`
+    await Bun.$`mkdir -p target`
     await Promise.all(targets.map(async target =>
         await Bun.$`bun build --compile --minify --sourcemap \
         --target=${targetNameToBunReadable(target)} \

@@ -5,8 +5,7 @@ export const terminateMessage = "[会话已中断]"
 
 type BuildSystemPromptString = (envVarsPart: string) => string
 type BuildDummyAnswer = (question: string) => string
-type BuildFishFunction = (dir: string) => string
-type BuildPowershellFunction = (dir: string) => string
+type BuildShellFunction = (shell: string, isExeFile: boolean, path: string) => string
 
 export const buildSystemPromptString: BuildSystemPromptString = (envVarsPart) => `
 你是一位热心的、乐于助人的女生。你会认为自己就是她，在问答、思考或者任何其他时候都会这么认为。
@@ -50,12 +49,14 @@ cat /etc/os-release
 ${qwqCommandEndId}
 `.trim()
 
-export const buildFishFunction: BuildFishFunction = (dir) => `
+export const buildShellFunction: BuildShellFunction = (shell, isExeFile, path) => {
+    const startCmd = isExeFile ? path : "bun --silent start"
+    if (shell === "fish") return `
 function qwq
     printf "在想呢……"
-    cd ${dir}
-    set -l answer (bun --silent start ask $argv | string collect -a | string trim | string collect -a)
-    set -l rawCommand (bun --silent start extract-cmd $answer)
+    ${isExeFile ? "" : `cd ${path}`}
+    set -l answer (${startCmd} ask $argv | string collect -a | string trim | string collect -a)
+    set -l rawCommand (${startCmd} extract-cmd $answer)
     set -l command (string collect -a $rawCommand | string trim | string collect -a)
     set -l isEmpty (string length $rawCommand)[1]
     if [ $isEmpty != "0" ]
@@ -84,16 +85,15 @@ function qwq
         printf "\\n"
         printf "%s\\n" $answer
     end
-    prevd
+    ${isExeFile ? "" : "prevd"}
 end
 `.trim()
-
-export const buildPowershellFunction: BuildPowershellFunction = (dir) => `
+    else if (shell === "powershell") return `
 function qwq {
     Write-Host -NoNewline "在想呢……"
-    Push-Location ${dir}
-    $answer = (bun --silent start ask $Args | Out-String).Trim()
-    $command = (bun --silent start extract-cmd $answer | Out-String).Trim()
+    ${isExeFile ? "" : `Push-Location ${path}`}
+    $answer = (${startCmd} ask $Args | Out-String).Trim()
+    $command = (${startCmd} extract-cmd $answer | Out-String).Trim()
     if ($command) {
         $answerText = ($answer -split "\`nQWQ COMMAND BEGIN", -2)[0].Trim()
         Write-Host ""
@@ -131,6 +131,8 @@ function qwq {
         Write-Host ""
         Write-Host $answer
     }
-    Pop-Location
+    ${isExeFile ? "" : "Pop-Location"}
 }
 `.trim()
+    else return `暂时还不支持${shell}喵~`
+}
