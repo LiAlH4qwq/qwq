@@ -2,6 +2,8 @@ import * as yaml from "yaml"
 import * as types from "types"
 import * as templetes from "templetes"
 
+type IO<T> = T
+
 type Main = (args: string[]) => Promise<never>
 type ShellIntegrate = (shell: string) => Promise<void>
 type ExtractCommand = (answer: string) => Promise<void>

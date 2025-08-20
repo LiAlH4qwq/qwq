@@ -15,17 +15,6 @@
   },
   "scripts": {
     "start": "bun src/index.ts",
-    "pack": "bun pack-linux-x64 && bun pack-linux-x64-legacy && bun pack-linux-arm64 && bun pack-linux-x64-musl && bun pack-linux-x64-musl-legacy && bun pack-linux-arm64-musl && bun pack-darwin-x64 && bun pack-darwin-x64-legacy && bun pack-darwin-arm64 && bun pack-windows-x64 && bun pack-windows-x64-legacy",
-    "pack-linux-x64": "bun build --compile --minify --sourcemap --target=bun-linux-x64-modern --outfile=target/qwq-linux-x64 src/index.ts",
-    "pack-linux-x64-legacy": "bun build --compile --minify --sourcemap --target=bun-linux-x64-baseline --outfile=target/qwq-linux-x64-legacy src/index.ts",
-    "pack-linux-arm64": "bun build --compile --minify --sourcemap --target=bun-linux-arm64-modern --outfile=target/qwq-linux-arm64 src/index.ts",
-    "pack-linux-x64-musl": "bun build --compile --minify --sourcemap --target=bun-linux-x64-musl-modern --outfile=target/qwq-linux-x64-musl src/index.ts",
-    "pack-linux-x64-musl-legacy": "bun build --compile --minify --sourcemap --target=bun-linux-x64-musl-baseline --outfile=target/qwq-linux-x64-musl-legacy src/index.ts",
-    "pack-linux-arm64-musl": "bun build --compile --minify --sourcemap --target=bun-linux-arm64-musl-modern --outfile=target/qwq-linux-arm64-musl src/index.ts",
-    "pack-darwin-x64": "bun build --compile --minify --sourcemap --target=bun-darwin-x64-modern --outfile=target/qwq-darwin-x64.app src/index.ts",
-    "pack-darwin-x64-legacy": "bun build --compile --minify --sourcemap --target=bun-darwin-x64-baseline --outfile=target/qwq-darwin-x64-legacy.app src/index.ts",
-    "pack-darwin-arm64": "bun build --compile --minify --sourcemap --target=bun-darwin-arm64-modern --outfile=target/qwq-darwin-arm64.app src/index.ts",
-    "pack-windows-x64": "bun build --compile --minify --sourcemap --target=bun-windows-x64-modern --outfile=target/qwq-windows-x64.exe src/index.ts",
-    "pack-windows-x64-legacy": "bun build --compile --minify --sourcemap --target=bun-windows-x64-baseline --outfile=target/qwq-windows-x64-legacy.exe src/index.ts"
+    "pack": "bun build.ts"
   }
 }
