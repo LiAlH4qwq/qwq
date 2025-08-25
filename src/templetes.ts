@@ -54,25 +54,24 @@ export const buildShellFunction: BuildShellFunction = (shell, isExeFile, path) =
     if (shell === "fish") return `
 function qwq
     printf "在想呢……"
-    ${isExeFile ? "" : `cd ${path}`}
+    ${isExeFile ? "" : `pushd ${path}`}
     set -l answer (${startCmd} ask $argv | string collect -a | string trim | string collect -a)
-    set -l rawCommand (${startCmd} extract-cmd $answer)
-    set -l command (string collect -a $rawCommand | string trim | string collect -a)
-    set -l isEmpty (string length $rawCommand)[1]
-    if [ $isEmpty != "0" ]
-        set -l answerTextRaw (string split -rm 1 \\n"QWQ COMMAND BEGIN" $answer)[1]
-        set -l answerText (string trim $answerTextRaw | string collect -a)
-        printf "\\n"
-        printf "%s\\n" $answerText
+    set -l isCmdExists (${startCmd} check-cmd-exist $answer | string collect -a | string trim | string collect -a)
+    set -l text (${startCmd} extract-text $answer | string collect -a | string trim | string collect -a)
+    printf "\\n"
+    if [ $isCmdExists = "true" ]
+        set -l cmd (${startCmd} extract-cmd $answer | string collect -a | string trim | string collect -a)
+        printf "%s\\n" $text
         printf "\\n"
         printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\n"
-        printf "%s\\n" $command
+        printf "%s\\n" $cmd
+        printf "\\n"
         while true
-            read -lP "你的选择：" confirm
-            switch $confirm
+            read -lP "你的选择：" choice
+            switch $choice
                 case "y" "yes" "Y" "Yes" "YES"
                     printf "好耶！\\n"
-                    printf "%s\\n" $command | source
+                    printf "%s\\n" $cmd | source
                     break
                 case "n" "no" "N" "No" "NO" ""
                     printf "指令没有执行哦~\\n"
@@ -82,10 +81,9 @@ function qwq
             end
         end
     else
-        printf "\\n"
-        printf "%s\\n" $answer
+        printf "%s\\n" $text
     end
-    ${isExeFile ? "" : "prevd"}
+    ${isExeFile ? "" : "popd"}
 end
 `.trim()
     else if (shell === "powershell") return `
@@ -93,25 +91,26 @@ function qwq {
     Write-Host -NoNewline "在想呢……"
     ${isExeFile ? "" : `Push-Location ${path}`}
     $answer = (${startCmd} ask $Args | Out-String).Trim()
-    $command = (${startCmd} extract-cmd $answer | Out-String).Trim()
-    if ($command) {
-        $answerText = ($answer -split "\`nQWQ COMMAND BEGIN", -2)[0].Trim()
-        Write-Host ""
-        Write-Host $answerText
+    $isCmdExists = (${startCmd} check-cmd-exist $answer | Out-String).Trim()
+    $text = (${startCmd} extract-text $answer | Out-String).Trim()
+    Write-Host ""
+    if ($isCmdExists -eq "true") {
+        $cmd = (${startCmd} extract-cmd $answer | Out-String).Trim()
+        Write-Host $text
         Write-Host ""
         Write-Host "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~"
-        Write-Host $command
+        Write-Host $cmd
         :loop while ($true) {
-            $confirm = Read-Host "你的选择"
-            switch ($confirm) {
+            $choice = Read-Host "你的选择"
+            switch ($choice) {
                 "y" {
                     Write-Host "好耶！"
-                    Invoke-Expression $command
+                    Invoke-Expression $cmd
                     break loop
                 }
                 "yes" {
                     Write-Host "好耶！"
-                    Invoke-Expression $command
+                    Invoke-Expression $cmd
                     break loop
                 }
                 "n" {
@@ -132,8 +131,7 @@ function qwq {
             }
         }
     } else {
-        Write-Host ""
-        Write-Host $answer
+        Write-Host $text
     }
     ${isExeFile ? "" : "Pop-Location"}
 }

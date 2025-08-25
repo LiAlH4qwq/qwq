@@ -8,6 +8,8 @@ type Main = (args: string[]) => Promise<never>
 
 // Entry
 type IntegrateShell = (args: string[]) => Promise<void>
+type CheckCmdExist = (args: string[]) => Promise<void>
+type ExtractText = (args: string[]) => Promise<void>
 type ExtractCommand = (args: string[]) => Promise<void>
 type Ask = (args: string[]) => Promise<void>
 
@@ -26,6 +28,8 @@ type ParseResponseAnthropic = (result: types.ResponseResultAnthropic) => Promise
 type ParseResponseOpenai = (result: types.ResponseResultOpenai) => Promise<string>
 type Sleep = (ms: number) => Promise<void>
 type ArgsToText = (args: string[]) => Promise<string>
+type IsCmdExists = (text: string) => Promise<boolean>
+type SplitTextAndCmd = (answer: string) => Promise<[string, string]>
 type FilterResponseText = (text: string) => Promise<string>
 
 
@@ -33,7 +37,9 @@ const main: Main = async (args) => {
     const subCommand = args.at(0)
     const restArgs = args.slice(1)
     if (restArgs.length <= 0) process.exit()
-    if (subCommand === "integrate-shell") await integrateShell(restArgs)
+    else if (subCommand === "integrate-shell") await integrateShell(restArgs)
+    else if (subCommand === "check-cmd-exist") await checkCmdExist(restArgs)
+    else if (subCommand === "extract-text") await extractText(restArgs)
     else if (subCommand === "extract-cmd") await extractCommand(restArgs)
     else if (subCommand === "ask") await ask(restArgs)
     process.exit()
@@ -51,20 +57,23 @@ const integrateShell: IntegrateShell = async (args) => {
     console.log(shellFunc)
 }
 
+const checkCmdExist: CheckCmdExist = async (args) => {
+    const answer = await argsToText(args)
+    await isCmdExists(answer) ? console.log("true") : console.log("false")
+}
+
+const extractText: ExtractText = async (args) => {
+    const answer = await argsToText(args)
+    const textAndCmd = await splitTextAndCmd(answer)
+    const text = textAndCmd.at(0)
+    console.log(text)
+}
+
 const extractCommand: ExtractCommand = async (args) => {
     const answer = await argsToText(args)
-    if (answer.includes(templetes.qwqCommandBeginId) && answer.includes(templetes.qwqCommandEndId)) {
-        const afterBeginId =
-            answer
-                .split(templetes.qwqCommandBeginId)
-                .at(-1)
-        const command =
-            afterBeginId
-                .split(templetes.qwqCommandEndId)
-                .at(0)
-                .trim()
-        console.log(command)
-    }
+    const textAndCmd = await splitTextAndCmd(answer)
+    const cmd = textAndCmd.at(1)
+    console.log(cmd)
 }
 
 const ask: Ask = async (args) => {
@@ -187,6 +196,32 @@ const parseResponseAnthropic: ParseResponseAnthropic = async (result) => {
 const parseResponseOpenai: ParseResponseOpenai = async (result) => {
     const text = result.choices.at(0).message.content
     return text
+}
+
+const isCmdExists: IsCmdExists = async (text) => {
+    const lastBeginIdIndex = text.lastIndexOf(templetes.qwqCommandBeginId)
+    const lastEndIdIndex = text.lastIndexOf(templetes.qwqCommandEndId)
+    if (lastBeginIdIndex === -1 || lastEndIdIndex === -1) return false
+    else if (lastBeginIdIndex > lastEndIdIndex) return false
+    else return true
+}
+
+const splitTextAndCmd: SplitTextAndCmd = async (answer) => {
+    const cmdExists = await isCmdExists(answer)
+    if (!cmdExists) return [answer.trim(), ""]
+    const answerSplitedByBeginId = answer.split(templetes.qwqCommandBeginId)
+    const text =
+        answerSplitedByBeginId
+            .slice(0, -1)
+            .join(templetes.qwqCommandBeginId)
+            .trim()
+    const command =
+        answerSplitedByBeginId
+            .at(-1)
+            .split(templetes.qwqCommandEndId)
+            .at(0)
+            .trim()
+    return [text, command]
 }
 
 if (import.meta.path === Bun.main) main(Bun.argv.slice(2))
