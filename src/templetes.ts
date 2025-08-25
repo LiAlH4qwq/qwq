@@ -74,7 +74,7 @@ function qwq
                     printf "好耶！\\n"
                     printf "%s\\n" $command | source
                     break
-                case "n" "no" "N" "No" "NO"
+                case "n" "no" "N" "No" "NO" ""
                     printf "指令没有执行哦~\\n"
                     break
                 case "*"
@@ -119,6 +119,10 @@ function qwq {
                     break loop
                 }
                 "no" {
+                    Write-Host "指令没有执行哦~"
+                    break loop
+                }
+                "" {
                     Write-Host "指令没有执行哦~"
                     break loop
                 }
