@@ -270,4 +270,4 @@ const splitTextAndCmd: SplitTextAndCmd = async (answer) => {
     return [text, command]
 }
 
-if (import.meta.path === Bun.main) main(Bun.argv.slice(2))
+if (import.meta.main) main(Bun.argv.slice(2))
