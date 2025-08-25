@@ -1,6 +1,6 @@
 # QwQ
 
-在命令行中的AI伴侣！
+命令行中的AI伴侣！
 
 ## 她可以……
 
@@ -131,6 +131,7 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
 - [x] 支持常见 API 格式
 - [x] 支持获取系统环境变量信息
+- [x] 支持记忆（连续对话）功能
 - [ ] 支持 POSIX SHELL (Bash、Zsh、etc...) 集成
 - [ ] 支持推理模型
 - [ ] 支持图文生文模型
