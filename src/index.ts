@@ -17,11 +17,12 @@ type Ask = (args: string[]) => Promise<void>
 type AskDebug = (question: string) => Promise<string>
 type AskAi = (question: string, config: types.Config, envVars: env.EnvVar[]) => Promise<string>
 type GetConfig = () => Promise<types.Config>
+type RotateThenGetCache = (newMessages: types.Message[]) => Promise<types.Message[]>
 
 // Pure
-type BuildRequest = (question: string, config: types.Config, envVars: env.EnvVar[]) => Promise<types.Request>
-type BuildRequestBody = (question: string, config: types.Config, envVars: env.EnvVar[]) => Promise<types.RequestBoby>
-type BuildMessages = (question: string, config: types.Config, envVars: env.EnvVar[]) => Promise<types.Message[]>
+type BuildRequest = (question: string, cache: types.Message[], config: types.Config, envVars: env.EnvVar[]) => Promise<types.Request>
+type BuildRequestBody = (question: string, cache: types.Message[], config: types.Config, envVars: env.EnvVar[]) => Promise<types.RequestBoby>
+type BuildMessages = (question: string, cache: types.Message[], config: types.Config, envVars: env.EnvVar[]) => Promise<types.Message[]>
 type BuildSystemPrompt = (config: types.Config, envVars: env.EnvVar[]) => Promise<string>
 type BuildEnvVarsPart = (envVars: env.EnvVar[]) => Promise<string>
 type ParseResponseAnthropic = (result: types.ResponseResultAnthropic) => Promise<string>
@@ -98,16 +99,39 @@ const askDebug: AskDebug = async (question) => {
 
 const askAi: AskAi = async (question, config, envVars) => {
     const apiType = config.api.type
-    const request = await buildRequest(question, config, envVars)
+    const cache = await rotateThenGetCache([])
+    const request = await buildRequest(question, cache, config, envVars)
     const response = await fetch(config.api.url, request)
     const result = await response.json()
     if (apiType === "anthropic") {
         const rawText = await parseResponseAnthropic(result as types.ResponseResultAnthropic)
         const text = await filterResponseText(rawText)
+        const messages: types.Message[] = [
+            {
+                role: "user",
+                content: question
+            },
+            {
+                role: "assistant",
+                content: text
+            }
+        ]
+        await rotateThenGetCache(messages)
         return text
     } else if (apiType === "openai") {
         const rawText = await parseResponseOpenai(result as types.ResponseResultOpenai)
         const text = await filterResponseText(rawText)
+        const messages: types.Message[] = [
+            {
+                role: "user",
+                content: question
+            },
+            {
+                role: "assistant",
+                content: text
+            }
+        ]
+        await rotateThenGetCache(messages)
         return text
     } else {
         const text = `暂时还不支持${apiType}这种API喵`
@@ -124,11 +148,32 @@ const getConfig: GetConfig = async () => {
     return config
 }
 
-const buildRequest: BuildRequest = async (question, config, envVars) => {
+const rotateThenGetCache: RotateThenGetCache = async (newMessages) => {
+    const cacheDir = env.getWorkingDir()
+    const cachePath = `${cacheDir}/cache.json`
+    const cacheFile = Bun.file(cachePath)
+    const newMessagesStr = JSON.stringify(newMessages, undefined, "  ")
+    if (!await cacheFile.exists()) {
+        await cacheFile.write(newMessagesStr)
+        return newMessages
+    }
+    const cache = await cacheFile.json() as types.Message[]
+    if (cache.length <= 0 || cache.at(-1).content === templetes.terminateMessage) {
+        await cacheFile.write(newMessagesStr)
+        return newMessages
+    }
+    const rotatedCache = cache.slice(- (10 - 1) * 2)
+    const newCache = [...rotatedCache, ...newMessages]
+    const newCacheStr = JSON.stringify(newCache, undefined, "  ")
+    await cacheFile.write(newCacheStr)
+    return newCache
+}
+
+const buildRequest: BuildRequest = async (question, cache, config, envVars) => {
     const headers = new Headers()
     headers.append("Authorization", `Bearer ${config.api.key}`)
     headers.append("Content-Type", "application/json")
-    const body = await buildRequestBody(question, config, envVars)
+    const body = await buildRequestBody(question, cache, config, envVars)
     const request = {
         method: "POST" as "POST",
         headers: headers,
@@ -137,8 +182,8 @@ const buildRequest: BuildRequest = async (question, config, envVars) => {
     return request
 }
 
-const buildRequestBody: BuildRequestBody = async (question, config, envVars) => {
-    const messages = await buildMessages(question, config, envVars)
+const buildRequestBody: BuildRequestBody = async (question, cache, config, envVars) => {
+    const messages = await buildMessages(question, cache, config, envVars)
     const body = {
         model: config.api.model,
         messages: messages
@@ -146,7 +191,7 @@ const buildRequestBody: BuildRequestBody = async (question, config, envVars) => 
     return body
 }
 
-const buildMessages: BuildMessages = async (question, config, envVars) => {
+const buildMessages: BuildMessages = async (question, cache, config, envVars) => {
     const systemPrompt = await buildSystemPrompt(config, envVars)
     const systemMessage = {
         role: "system" as "system",
@@ -156,7 +201,7 @@ const buildMessages: BuildMessages = async (question, config, envVars) => {
         role: "user" as "user",
         content: question
     }
-    const messages = [systemMessage, questionMessage]
+    const messages = [systemMessage, ...cache, questionMessage]
     return messages
 }
 
@@ -172,22 +217,6 @@ const buildEnvVarsPart: BuildEnvVarsPart = async (envVars) => {
     return envVarsPart
 }
 
-const sleep: Sleep = async (ms) =>
-    await new Promise(resolve => setTimeout(() => resolve(), ms))
-
-const argsToText: ArgsToText = async (args) =>
-    args
-        .join(" ")
-        .replaceAll("\\n", "\n")
-
-const filterResponseText: FilterResponseText = async (text) => {
-    const trimmedText = text.trim()
-    if (trimmedText.startsWith(templetes.qwqMetaTerminateId)
-        || trimmedText.endsWith(templetes.qwqMetaTerminateId))
-        return templetes.terminateMessage
-    return trimmedText
-}
-
 const parseResponseAnthropic: ParseResponseAnthropic = async (result) => {
     const text = result.content.at(0).text
     return text
@@ -196,6 +225,23 @@ const parseResponseAnthropic: ParseResponseAnthropic = async (result) => {
 const parseResponseOpenai: ParseResponseOpenai = async (result) => {
     const text = result.choices.at(0).message.content
     return text
+}
+
+const sleep: Sleep = async (ms) =>
+    await new Promise(resolve => setTimeout(() => resolve(), ms))
+
+const argsToText: ArgsToText = async (args) =>
+    args
+        .join(" ")
+        .replaceAll("\\n", "\n")
+        .trim()
+
+const filterResponseText: FilterResponseText = async (text) => {
+    const trimmedText = text.trim()
+    if (trimmedText.startsWith(templetes.qwqMetaTerminateId)
+        || trimmedText.endsWith(templetes.qwqMetaTerminateId))
+        return templetes.terminateMessage
+    return trimmedText
 }
 
 const isCmdExists: IsCmdExists = async (text) => {
