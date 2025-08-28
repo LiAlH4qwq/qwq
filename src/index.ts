@@ -1,8 +1,24 @@
-import * as yaml from "yaml"
+import type {
+    Config,
+    Message,
+    Request,
+    RequestBoby,
+    ResponseResultAnthropic,
+    ResponseResultOpenai
+} from "types"
+import type { EnvVar } from "env"
 
-import * as env from "env"
-import * as types from "types"
-import * as templetes from "templetes"
+import { compile, decompile } from "hxqa"
+import {
+    terminateMessage,
+    qwqMetaTerminateId,
+    qwqCommandBeginId,
+    qwqCommandEndId,
+    buildSystemPromptString,
+    buildShellFunction,
+    buildDummyAnswer
+} from "templetes"
+import { getIsExeFile, getExePathOrSrcDir, getWorkingDir, getEnvVars } from "env"
 
 type Main = (args: string[]) => Promise<never>
 
@@ -15,24 +31,25 @@ type Ask = (args: string[]) => Promise<void>
 
 // Dirty
 type AskDebug = (question: string) => Promise<string>
-type AskAi = (question: string, config: types.Config, envVars: env.EnvVar[]) => Promise<string>
-type GetConfig = () => Promise<types.Config>
-type RotateThenGetCache = (newMessages: types.Message[]) => Promise<types.Message[]>
+type AskAi = (question: string, config: Config, envVars: EnvVar[]) => Promise<string>
+type GetConfig = () => Promise<Config>
+type RotateThenGetCache = (newMessages: Message[]) => Promise<Message[]>
 
 // Pure
-type BuildRequest = (question: string, cache: types.Message[], config: types.Config, envVars: env.EnvVar[]) => Promise<types.Request>
-type BuildRequestBody = (question: string, cache: types.Message[], config: types.Config, envVars: env.EnvVar[]) => Promise<types.RequestBoby>
-type BuildMessages = (question: string, cache: types.Message[], config: types.Config, envVars: env.EnvVar[]) => Promise<types.Message[]>
-type BuildSystemPrompt = (config: types.Config, envVars: env.EnvVar[]) => Promise<string>
-type BuildEnvVarsPart = (envVars: env.EnvVar[]) => Promise<string>
-type ParseResponseAnthropic = (result: types.ResponseResultAnthropic) => Promise<string>
-type ParseResponseOpenai = (result: types.ResponseResultOpenai) => Promise<string>
+type BuildRequest = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<Request>
+type BuildRequestBody = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<RequestBoby>
+type BuildMessages = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<Message[]>
+type BuildSystemPrompt = (config: Config, envVars: EnvVar[]) => Promise<string>
+type BuildEnvVarsPart = (envVars: EnvVar[]) => Promise<string>
+type ParseResponseAnthropic = (result: ResponseResultAnthropic) => Promise<string>
+type ParseResponseOpenai = (result: ResponseResultOpenai) => Promise<string>
 type Sleep = (ms: number) => Promise<void>
 type ArgsToText = (args: string[]) => Promise<string>
 type IsCmdExists = (text: string) => Promise<boolean>
 type SplitTextAndCmd = (answer: string) => Promise<[string, string]>
 type FilterResponseText = (text: string) => Promise<string>
-
+type MessagesToHxqa = (messages: Message[]) => Promise<string>
+type HxqaToMessages = (hxqa: string) => Promise<Message[]>
 
 const main: Main = async (args) => {
     const subCommand = args.at(0)
@@ -52,9 +69,9 @@ const integrateShell: IntegrateShell = async (args) => {
             .trim()
             .toLowerCase()
     const shell = shellText === "" ? "<undefined>" : shellText
-    const isExeFile = env.getIsExeFile()
-    const path = env.getExePathOrSrcDir()
-    const shellFunc = templetes.buildShellFunction(shell, isExeFile, path)
+    const isExeFile = getIsExeFile()
+    const path = getExePathOrSrcDir()
+    const shellFunc = buildShellFunction(shell, isExeFile, path)
     console.log(shellFunc)
 }
 
@@ -80,7 +97,7 @@ const extractCommand: ExtractCommand = async (args) => {
 const ask: Ask = async (args) => {
     const question = await argsToText(args)
     const config = await getConfig()
-    const envVars = env.getEnvVars(config.env_access.env_vars)
+    const envVars = getEnvVars(config.env_access.env_vars)
     if (config.debug) {
         const answer = await askDebug(question)
         console.log(answer)
@@ -92,7 +109,7 @@ const ask: Ask = async (args) => {
 }
 
 const askDebug: AskDebug = async (question) => {
-    const dummyAnswer = templetes.buildDummyAnswer(question)
+    const dummyAnswer = buildDummyAnswer(question)
     await sleep(1000)
     return dummyAnswer
 }
@@ -104,9 +121,9 @@ const askAi: AskAi = async (question, config, envVars) => {
     const response = await fetch(config.api.url, request)
     const result = await response.json()
     if (apiType === "anthropic") {
-        const rawText = await parseResponseAnthropic(result as types.ResponseResultAnthropic)
+        const rawText = await parseResponseAnthropic(result as ResponseResultAnthropic)
         const text = await filterResponseText(rawText)
-        const messages: types.Message[] = [
+        const messages: Message[] = [
             {
                 role: "user",
                 content: question
@@ -119,9 +136,9 @@ const askAi: AskAi = async (question, config, envVars) => {
         await rotateThenGetCache(messages)
         return text
     } else if (apiType === "openai") {
-        const rawText = await parseResponseOpenai(result as types.ResponseResultOpenai)
+        const rawText = await parseResponseOpenai(result as ResponseResultOpenai)
         const text = await filterResponseText(rawText)
-        const messages: types.Message[] = [
+        const messages: Message[] = [
             {
                 role: "user",
                 content: question
@@ -140,32 +157,33 @@ const askAi: AskAi = async (question, config, envVars) => {
 }
 
 const getConfig: GetConfig = async () => {
-    const configDir = env.getWorkingDir()
+    const configDir = getWorkingDir()
     const configPath = `${configDir}/config.yaml`
     const configFile = Bun.file(configPath)
     const configText = await configFile.text()
-    const config = yaml.parse(configText) as types.Config
+    const config = Bun.YAML.parse(configText) as Config
     return config
 }
 
 const rotateThenGetCache: RotateThenGetCache = async (newMessages) => {
-    const cacheDir = env.getWorkingDir()
-    const cachePath = `${cacheDir}/cache.json`
+    const cacheDir = getWorkingDir()
+    const cachePath = `${cacheDir}/cache.hxqa`
     const cacheFile = Bun.file(cachePath)
-    const newMessagesStr = JSON.stringify(newMessages, undefined, "  ")
+    const newMessagesHxqa = await messagesToHxqa(newMessages)
     if (!await cacheFile.exists()) {
-        await cacheFile.write(newMessagesStr)
+        await cacheFile.write(newMessagesHxqa)
         return newMessages
     }
-    const cache = await cacheFile.json() as types.Message[]
-    if (cache.length <= 0 || cache.at(-1).content === templetes.terminateMessage) {
-        await cacheFile.write(newMessagesStr)
+    const cacheHxqa = await cacheFile.text()
+    const cache = await hxqaToMessages(cacheHxqa)
+    if (cache.length <= 0 || cache.at(-1).content === terminateMessage) {
+        await cacheFile.write(newMessagesHxqa)
         return newMessages
     }
     const rotatedCache = cache.slice(- (10 - 1) * 2)
     const newCache = [...rotatedCache, ...newMessages]
-    const newCacheStr = JSON.stringify(newCache, undefined, "  ")
-    await cacheFile.write(newCacheStr)
+    const newCacheHxqa = await messagesToHxqa(newCache)
+    await cacheFile.write(newCacheHxqa)
     return newCache
 }
 
@@ -207,7 +225,7 @@ const buildMessages: BuildMessages = async (question, cache, config, envVars) =>
 
 const buildSystemPrompt: BuildSystemPrompt = async (config, envVars) => {
     const envVarsPart = await buildEnvVarsPart(envVars)
-    const systemPrompt = templetes.buildSystemPromptString(envVarsPart)
+    const systemPrompt = buildSystemPromptString(envVarsPart)
     return systemPrompt
 }
 
@@ -238,15 +256,15 @@ const argsToText: ArgsToText = async (args) =>
 
 const filterResponseText: FilterResponseText = async (text) => {
     const trimmedText = text.trim()
-    if (trimmedText.startsWith(templetes.qwqMetaTerminateId)
-        || trimmedText.endsWith(templetes.qwqMetaTerminateId))
-        return templetes.terminateMessage
+    if (trimmedText.startsWith(qwqMetaTerminateId)
+        || trimmedText.endsWith(qwqMetaTerminateId))
+        return terminateMessage
     return trimmedText
 }
 
 const isCmdExists: IsCmdExists = async (text) => {
-    const lastBeginIdIndex = text.lastIndexOf(templetes.qwqCommandBeginId)
-    const lastEndIdIndex = text.lastIndexOf(templetes.qwqCommandEndId)
+    const lastBeginIdIndex = text.lastIndexOf(qwqCommandBeginId)
+    const lastEndIdIndex = text.lastIndexOf(qwqCommandEndId)
     if (lastBeginIdIndex === -1 || lastEndIdIndex === -1) return false
     else if (lastBeginIdIndex > lastEndIdIndex) return false
     else return true
@@ -255,19 +273,36 @@ const isCmdExists: IsCmdExists = async (text) => {
 const splitTextAndCmd: SplitTextAndCmd = async (answer) => {
     const cmdExists = await isCmdExists(answer)
     if (!cmdExists) return [answer.trim(), ""]
-    const answerSplitedByBeginId = answer.split(templetes.qwqCommandBeginId)
+    const answerSplitedByBeginId = answer.split(qwqCommandBeginId)
     const text =
         answerSplitedByBeginId
             .slice(0, -1)
-            .join(templetes.qwqCommandBeginId)
+            .join(qwqCommandBeginId)
             .trim()
     const command =
         answerSplitedByBeginId
             .at(-1)
-            .split(templetes.qwqCommandEndId)
+            .split(qwqCommandEndId)
             .at(0)
             .trim()
     return [text, command]
+}
+
+const messagesToHxqa: MessagesToHxqa = async (messages) => {
+    const messagesWrapped = { messages }
+    const messagesJsonl = JSON.stringify(messagesWrapped)
+    const result = decompile(messagesJsonl)
+    if (result.pass) return result.value
+    else return ""
+}
+
+const hxqaToMessages: HxqaToMessages = async (hxqa) => {
+    const result = compile(hxqa)
+    if (!result.pass) return []
+    const jsonl = result.value
+    const messagesWrapped = JSON.parse(jsonl) as { messages: Message[] }
+    const messages = messagesWrapped.messages
+    return messages
 }
 
 if (import.meta.main) main(Bun.argv.slice(2))

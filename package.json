@@ -8,10 +8,10 @@
     "@types/bun": "latest"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.9.2"
   },
   "dependencies": {
-    "yaml": "^2.8.1"
+    "hxqa": "^0.2.2"
   },
   "scripts": {
     "start": "bun src/index.ts",
