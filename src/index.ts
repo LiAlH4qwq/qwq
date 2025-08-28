@@ -20,25 +20,19 @@ import {
 } from "templetes"
 import { getIsExeFile, getExePathOrSrcDir, getWorkingDir, getEnvVars } from "env"
 
-type Main = (args: string[]) => Promise<never>
-
-// Entry
-type IntegrateShell = (args: string[]) => Promise<void>
-type CheckCmdExist = (args: string[]) => Promise<void>
-type ExtractText = (args: string[]) => Promise<void>
-type ExtractCommand = (args: string[]) => Promise<void>
-type Ask = (args: string[]) => Promise<void>
-
 // Dirty
+type Main = (args: string[]) => Promise<never>
+type Entry = (args: string[]) => Promise<void>
 type AskDebug = (question: string) => Promise<string>
 type AskAi = (question: string, config: Config, envVars: EnvVar[]) => Promise<string>
 type GetConfig = () => Promise<Config>
 type RotateThenGetCache = (newMessages: Message[]) => Promise<Message[]>
 
 // Pure
-type BuildRequest = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<Request>
-type BuildRequestBody = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<RequestBoby>
-type BuildMessages = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<Message[]>
+type Builder<T> = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<T>
+type BuildRequest = Builder<Request>
+type BuildRequestBody = Builder<RequestBoby>
+type BuildMessages = Builder<Message[]>
 type BuildSystemPrompt = (config: Config, envVars: EnvVar[]) => Promise<string>
 type BuildEnvVarsPart = (envVars: EnvVar[]) => Promise<string>
 type ParseResponseAnthropic = (result: ResponseResultAnthropic) => Promise<string>
@@ -63,7 +57,7 @@ const main: Main = async (args) => {
     process.exit()
 }
 
-const integrateShell: IntegrateShell = async (args) => {
+const integrateShell: Entry = async (args) => {
     const shellText =
         args.at(0)
             .trim()
@@ -75,26 +69,26 @@ const integrateShell: IntegrateShell = async (args) => {
     console.log(shellFunc)
 }
 
-const checkCmdExist: CheckCmdExist = async (args) => {
+const checkCmdExist: Entry = async (args) => {
     const answer = await argsToText(args)
     await isCmdExists(answer) ? console.log("true") : console.log("false")
 }
 
-const extractText: ExtractText = async (args) => {
+const extractText: Entry = async (args) => {
     const answer = await argsToText(args)
     const textAndCmd = await splitTextAndCmd(answer)
     const text = textAndCmd.at(0)
     console.log(text)
 }
 
-const extractCommand: ExtractCommand = async (args) => {
+const extractCommand: Entry = async (args) => {
     const answer = await argsToText(args)
     const textAndCmd = await splitTextAndCmd(answer)
     const cmd = textAndCmd.at(1)
     console.log(cmd)
 }
 
-const ask: Ask = async (args) => {
+const ask: Entry = async (args) => {
     const question = await argsToText(args)
     const config = await getConfig()
     const envVars = getEnvVars(config.env_access.env_vars)
