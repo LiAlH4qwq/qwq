@@ -4,7 +4,7 @@ export interface EnvVar {
 }
 
 // Dirty
-type GetEnvVars = (names: string[]) => EnvVar[]
+type GetEnvVars = (names: readonly string[]) => EnvVar[]
 type GetExePathOrSrcDir = () => string
 type GetWorkingDir = () => string
 type GetIsExeFile = () => boolean

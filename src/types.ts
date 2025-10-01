@@ -1,49 +1,81 @@
-export interface Config {
-    debug: boolean
-    api: ConfigApi
-    env_access: ConfigEnvAccess
-}
+import * as S from "effect/Schema"
 
-export interface ConfigApi {
-    type: "anthropic" | "openai"
-    url: string
-    key: string
-    model: string
-}
+export interface ConfigApi
+    extends S.Schema.Type<typeof ConfigApiS> { }
 
-export interface ConfigEnvAccess {
-    env_vars: string[]
-}
+export interface ConfigEnvAccess
+    extends S.Schema.Type<typeof ConfigEnvAccessS> { }
 
-export interface Request {
-    method: "POST"
-    headers: Headers
-    body: string
-}
+export interface Config
+    extends S.Schema.Type<typeof ConfigS> { }
 
-export interface RequestBoby {
-    model: string
-    messages: Message[]
-}
+export interface Message
+    extends S.Schema.Type<typeof MessageS> { }
 
-export interface Message {
-    role: "system" | "user" | "assistant"
-    content: string
-}
+export interface RequestBoby
+    extends S.Schema.Type<typeof RequestBobyS> { }
 
-export interface ResponseResultAnthropic {
-    content: ResponseResultContentAnthropic[]
-}
+export interface Request
+    extends S.Schema.Type<typeof RequestS> { headers: Headers }
 
-export interface ResponseResultContentAnthropic {
-    type: "text"
-    text: string
-}
+export interface ResponseResultContentAnthropic
+    extends S.Schema<typeof ResponseResultContentAnthropicS> { }
 
-export interface ResponseResultOpenai {
-    choices: ResponseResultChoiceOpenai[]
-}
+export interface ResponseResultAnthropic
+    extends S.Schema<typeof ResponseResultAnthropicS> { }
 
-export interface ResponseResultChoiceOpenai {
-    message: Message
-}
+export interface ResponseResultChoiceOpenai
+    extends S.Schema.Type<typeof ResponseResultChoiceOpenaiS> { }
+
+export interface ResponseResultOpenai
+    extends S.Schema.Type<typeof ResponseResultOpenaiS> { }
+
+export const ConfigApiS = S.Struct({
+    type: S.Literal("anthropic", "openai"),
+    url: S.String,
+    key: S.String,
+    model: S.String,
+})
+
+export const ConfigEnvAccessS = S.Struct({
+    env_vars: S.Array(S.String),
+})
+
+export const ConfigS = S.Struct({
+    debug: S.Boolean,
+    api: ConfigApiS,
+    env_access: ConfigEnvAccessS,
+})
+
+export const MessageS = S.Struct({
+    role: S.Literal("system", "assistant", "user"),
+    content: S.String,
+})
+
+export const RequestBobyS = S.Struct({
+    model: S.String,
+    messages: S.Array(MessageS),
+})
+
+export const RequestS = S.Struct({
+    method: S.Literal("POST"),
+    headers: S.Object,
+    body: S.String,
+})
+
+export const ResponseResultContentAnthropicS = S.Struct({
+    type: S.Literal("text"),
+    text: S.String,
+})
+
+export const ResponseResultAnthropicS = S.Struct({
+    content: S.Array(ResponseResultContentAnthropicS),
+})
+
+export const ResponseResultChoiceOpenaiS = S.Struct({
+    message: MessageS,
+})
+
+export const ResponseResultOpenaiS = S.Struct({
+    choices: S.Array(ResponseResultChoiceOpenaiS),
+})
