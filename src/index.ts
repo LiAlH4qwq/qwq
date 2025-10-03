@@ -1,30 +1,40 @@
+import { Either } from "effect"
+import { decodeUnknownEither } from "effect/Schema"
+import { compile, decompile } from "hxqa"
+
 import type {
+    QwqAnyhowResult as Result,
+    QwqError,
     Config,
     Message,
     Request,
     RequestBoby,
-    ResponseResultAnthropic,
-    ResponseResultOpenai
-} from "types"
-import type { EnvVar } from "env"
-
-import { compile, decompile } from "hxqa"
+} from "./types"
+import type { EnvVar } from "./env"
 import {
-    terminateMessage,
-    qwqMetaTerminateId,
-    qwqCommandBeginId,
-    qwqCommandEndId,
-    buildSystemPromptString,
-    buildShellFunction,
+    ResponseResultAnthropicS,
+    ResponseResultOpenaiS
+} from "./types"
+import {
+    getIsExeFile,
+    getExePathOrSrcDir,
+    getWorkingDir,
+    getEnvVars
+} from "./env"
+import {
+    qwqMetaTermId,
+    qwqCmdBeginId,
+    qwqCmdEndId,
+    qwqMetaTermMsg,
+    buildSysPrompt,
+    buildShellFunc,
     buildDummyAnswer
-} from "templetes"
-import { getIsExeFile, getExePathOrSrcDir, getWorkingDir, getEnvVars } from "env"
+} from "./templetes"
 
 // Dirty
 type Main = (args: string[]) => Promise<never>
 type Entry = (args: string[]) => Promise<void>
 type AskDebug = (question: string) => Promise<string>
-type AskAi = (question: string, config: Config, envVars: EnvVar[]) => Promise<string>
 type GetConfig = () => Promise<Config>
 type RotateThenGetCache = (newMessages: Message[]) => Promise<Message[]>
 
@@ -35,8 +45,6 @@ type BuildRequestBody = Builder<RequestBoby>
 type BuildMessages = Builder<Message[]>
 type BuildSystemPrompt = (config: Config, envVars: EnvVar[]) => Promise<string>
 type BuildEnvVarsPart = (envVars: EnvVar[]) => Promise<string>
-type ParseResponseAnthropic = (result: ResponseResultAnthropic) => Promise<string>
-type ParseResponseOpenai = (result: ResponseResultOpenai) => Promise<string>
 type Sleep = (ms: number) => Promise<void>
 type ArgsToText = (args: string[]) => Promise<string>
 type IsCmdExists = (text: string) => Promise<boolean>
@@ -65,7 +73,7 @@ const integrateShell: Entry = async (args) => {
     const shell = shellText === "" ? "<undefined>" : shellText
     const isExeFile = getIsExeFile()
     const path = getExePathOrSrcDir()
-    const shellFunc = buildShellFunction(shell, isExeFile, path)
+    const shellFunc = buildShellFunc(isExeFile, path, shell)
     console.log(shellFunc)
 }
 
@@ -97,8 +105,17 @@ const ask: Entry = async (args) => {
         console.log(answer)
     }
     else {
-        const answer = await askAi(question, config, envVars)
-        console.log(answer)
+        (await askAi(question, config, envVars)).pipe(
+            Either.match({
+                onLeft: (err) => {
+                    console.log("出错了喵：")
+                    console.log(err)
+                },
+                onRight: (ans) => {
+                    console.log(ans)
+                }
+            })
+        )
     }
 }
 
@@ -108,15 +125,20 @@ const askDebug: AskDebug = async (question) => {
     return dummyAnswer
 }
 
-const askAi: AskAi = async (question, config, envVars) => {
+const askAi = async (
+    question: string,
+    config: Config,
+    envVars: EnvVar[]
+): Promise<Result<string>> => {
     const apiType = config.api.type
     const cache = await rotateThenGetCache([])
     const request = await buildRequest(question, cache, config, envVars)
     const response = await fetch(config.api.url, request)
     const result = await response.json()
     if (apiType === "anthropic") {
-        const rawText = await parseResponseAnthropic(result as ResponseResultAnthropic)
-        const text = await filterResponseText(rawText)
+        const rawTextMaybe = await parseResponseAnthropic(result)
+        if (Either.isLeft(rawTextMaybe)) return rawTextMaybe
+        const text = await filterResponseText(rawTextMaybe.right)
         const messages: Message[] = [
             {
                 role: "user",
@@ -128,10 +150,11 @@ const askAi: AskAi = async (question, config, envVars) => {
             }
         ]
         await rotateThenGetCache(messages)
-        return text
+        return rawTextMaybe
     } else if (apiType === "openai") {
-        const rawText = await parseResponseOpenai(result as ResponseResultOpenai)
-        const text = await filterResponseText(rawText)
+        const rawTextMaybe = await parseResponseOpenai(result)
+        if (Either.isLeft(rawTextMaybe)) return rawTextMaybe
+        const text = await filterResponseText(rawTextMaybe.right)
         const messages: Message[] = [
             {
                 role: "user",
@@ -143,10 +166,17 @@ const askAi: AskAi = async (question, config, envVars) => {
             }
         ]
         await rotateThenGetCache(messages)
-        return text
+        return rawTextMaybe
     } else {
-        const text = `暂时还不支持${apiType}这种API喵`
-        return text
+        const errText = `暂时还不支持${apiType}这种API喵`
+        const err: QwqError = {
+            stage: "AskingAi",
+            category: "ApiConfigError",
+            what: "UnknownApiType",
+            details: errText,
+            raw: undefined
+        }
+        return Either.left(err)
     }
 }
 
@@ -170,7 +200,7 @@ const rotateThenGetCache: RotateThenGetCache = async (newMessages) => {
     }
     const cacheHxqa = await cacheFile.text()
     const cache = await hxqaToMessages(cacheHxqa)
-    if (cache.length <= 0 || cache.at(-1).content === terminateMessage) {
+    if (cache.length <= 0 || cache.at(-1).content === qwqMetaTermMsg) {
         await cacheFile.write(newMessagesHxqa)
         return newMessages
     }
@@ -219,7 +249,7 @@ const buildMessages: BuildMessages = async (question, cache, config, envVars) =>
 
 const buildSystemPrompt: BuildSystemPrompt = async (config, envVars) => {
     const envVarsPart = await buildEnvVarsPart(envVars)
-    const systemPrompt = buildSystemPromptString(envVarsPart)
+    const systemPrompt = buildSysPrompt(envVarsPart)
     return systemPrompt
 }
 
@@ -229,15 +259,39 @@ const buildEnvVarsPart: BuildEnvVarsPart = async (envVars) => {
     return envVarsPart
 }
 
-const parseResponseAnthropic: ParseResponseAnthropic = async (result) => {
-    const text = result.content.at(0).text
-    return text
-}
+const parseResponseAnthropic = async (
+    response: unknown
+): Promise<Result<string>> =>
+    decodeUnknownEither(ResponseResultAnthropicS)(response).pipe(
+        Either.map(res => res.content.at(0).text),
+        Either.mapLeft(err => {
+            const qwqErr: QwqError = {
+                stage: "ParsingResponse",
+                category: "UnexepectedResponse",
+                what: "UnknownResponseStructure",
+                details: err.message,
+                raw: err
+            }
+            return qwqErr
+        })
+    )
 
-const parseResponseOpenai: ParseResponseOpenai = async (result) => {
-    const text = result.choices.at(0).message.content
-    return text
-}
+const parseResponseOpenai = async (
+    response: unknown
+): Promise<Result<string>> =>
+    decodeUnknownEither(ResponseResultOpenaiS)(response).pipe(
+        Either.map(res => res.choices.at(0).message.content),
+        Either.mapLeft(err => {
+            const qwqErr: QwqError = {
+                stage: "ParsingResponse",
+                category: "UnexepectedResponse",
+                what: "UnknownResponseStructure",
+                details: err.message,
+                raw: err
+            }
+            return qwqErr
+        })
+    )
 
 const sleep: Sleep = async (ms) =>
     await new Promise(resolve => setTimeout(() => resolve(), ms))
@@ -250,15 +304,15 @@ const argsToText: ArgsToText = async (args) =>
 
 const filterResponseText: FilterResponseText = async (text) => {
     const trimmedText = text.trim()
-    if (trimmedText.startsWith(qwqMetaTerminateId)
-        || trimmedText.endsWith(qwqMetaTerminateId))
-        return terminateMessage
+    if (trimmedText.startsWith(qwqMetaTermId)
+        || trimmedText.endsWith(qwqMetaTermId))
+        return qwqMetaTermMsg
     return trimmedText
 }
 
 const isCmdExists: IsCmdExists = async (text) => {
-    const lastBeginIdIndex = text.lastIndexOf(qwqCommandBeginId)
-    const lastEndIdIndex = text.lastIndexOf(qwqCommandEndId)
+    const lastBeginIdIndex = text.lastIndexOf(qwqCmdBeginId)
+    const lastEndIdIndex = text.lastIndexOf(qwqCmdEndId)
     if (lastBeginIdIndex === -1 || lastEndIdIndex === -1) return false
     else if (lastBeginIdIndex > lastEndIdIndex) return false
     else return true
@@ -267,16 +321,16 @@ const isCmdExists: IsCmdExists = async (text) => {
 const splitTextAndCmd: SplitTextAndCmd = async (answer) => {
     const cmdExists = await isCmdExists(answer)
     if (!cmdExists) return [answer.trim(), ""]
-    const answerSplitedByBeginId = answer.split(qwqCommandBeginId)
+    const answerSplitedByBeginId = answer.split(qwqCmdBeginId)
     const text =
         answerSplitedByBeginId
             .slice(0, -1)
-            .join(qwqCommandBeginId)
+            .join(qwqCmdBeginId)
             .trim()
     const command =
         answerSplitedByBeginId
             .at(-1)
-            .split(qwqCommandEndId)
+            .split(qwqCmdEndId)
             .at(0)
             .trim()
     return [text, command]

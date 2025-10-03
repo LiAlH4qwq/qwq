@@ -1,4 +1,21 @@
+import * as E from "effect/Either"
 import * as S from "effect/Schema"
+
+export type QwqAnyhowResult<T> = E.Either<T, QwqError>
+
+export type QwqError = {
+    stage: "AskingAi"
+    category: "ApiConfigError"
+    what: "UnknownApiType"
+    details: string,
+    raw: undefined
+} | {
+    stage: "ParsingResponse"
+    category: "UnexepectedResponse"
+    what: "UnknownResponseStructure"
+    details: string
+    raw: unknown
+}
 
 export interface ConfigApi
     extends S.Schema.Type<typeof ConfigApiS> { }
