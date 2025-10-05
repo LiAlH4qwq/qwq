@@ -1,4 +1,4 @@
-import { Either, Match } from "effect"
+import { Console, Effect, Either, Match, pipe } from "effect"
 import { decodeUnknownEither } from "effect/Schema"
 import { compile, decompile } from "hxqa"
 
@@ -43,9 +43,6 @@ type BuildRequest = Builder<Request>
 type BuildRequestBody = Builder<RequestBoby>
 type BuildEnvVarsPart = (envVars: EnvVar[]) => Promise<string>
 type Sleep = (ms: number) => Promise<void>
-type ArgsToText = (args: string[]) => Promise<string>
-type IsCmdExists = (text: string) => Promise<boolean>
-type SplitTextAndCmd = (answer: string) => Promise<[string, string]>
 type FilterResponseText = (text: string) => Promise<string>
 type MessagesToHxqa = (messages: Message[]) => Promise<string>
 type HxqaToMessages = (hxqa: string) => Promise<Message[]>
@@ -54,50 +51,48 @@ const main = async (args: string[]) => {
     const subCommand = args.at(0)
     const restArgs = args.slice(1)
     Match.value(subCommand).pipe(
-        Match.when("integrate-shell", _ => integrateShell(restArgs)),
-        Match.when("check-cmd-exist", _ => checkCmdExist(restArgs)),
-        Match.when("extract-text", _ => extractText(restArgs)),
-        Match.when("extract-cmd", _ => extractCommand(restArgs)),
+        Match.when("integrate-shell", _ => integrateShell(restArgs).pipe(Effect.runFork)),
+        Match.when("check-cmd-exist", _ => checkCmdExist(restArgs).pipe(Effect.runFork)),
+        Match.when("extract-text", _ => extractText(restArgs).pipe(Effect.runFork)),
+        Match.when("extract-cmd", _ => extractCommand(restArgs).pipe(Effect.runFork)),
         Match.when("ask", _ => ask(restArgs)),
-        Match.orElse(_ => showHelp())
+        Match.orElse(_ => showHelp().pipe(Effect.runFork))
     )
 }
 
-const showHelp = async () => console.log("TODO")
+const showHelp = () => Console.log(`
+This binary is not intended for directly use, \
+please refer to the document for the usage.
+`.trim())
 
-const integrateShell: Entry = async (args) => {
-    const shellText =
-        args.at(0)
-            ?.trim()
-            .toLowerCase()
-    const shell =
-        shellText === undefined
-            || shellText === ""
-            ? "<undefined>" : shellText
-    const isExeFile = getIsExeFile()
-    const path = getExePathOrSrcDir()
-    const shellFunc = buildShellFunc(isExeFile, path, shell)
-    console.log(shellFunc)
-}
+const integrateShell = (args: string[]) => pipe(
+    buildShellFunc(getIsExeFile(), getExePathOrSrcDir(), argsToShellText(args)),
+    Console.log
+)
 
-const checkCmdExist: Entry = async (args) => {
-    const answer = await argsToText(args)
-    await isCmdExists(answer) ? console.log("true") : console.log("false")
-}
+const checkCmdExist = (args: string[]) => pipe(
+    args,
+    argsToText,
+    isCmdExists,
+    exists => exists ? "true" : "false",
+    Console.log
+)
 
-const extractText: Entry = async (args) => {
-    const answer = await argsToText(args)
-    const textAndCmd = await splitTextAndCmd(answer)
-    const text = textAndCmd.at(0)
-    console.log(text)
-}
+const extractText = (args: string[]) => pipe(
+    args,
+    argsToText,
+    splitTextAndCmd,
+    parts => parts.at(0),
+    Console.log
+)
 
-const extractCommand: Entry = async (args) => {
-    const answer = await argsToText(args)
-    const textAndCmd = await splitTextAndCmd(answer)
-    const cmd = textAndCmd.at(1)
-    console.log(cmd)
-}
+const extractCommand = (args: string[]) => pipe(
+    args,
+    argsToText,
+    splitTextAndCmd,
+    parts => parts.at(1),
+    Console.log
+)
 
 const ask: Entry = async (args) => {
     const question = await argsToText(args)
@@ -299,7 +294,12 @@ const parseResponseOpenai = async (
 const sleep: Sleep = async (ms) =>
     await new Promise(resolve => setTimeout(() => resolve(), ms))
 
-const argsToText: ArgsToText = async (args) =>
+const argsToShellText = (args: string[]) => {
+    const text = args.at(0)?.trim().toLowerCase()
+    return text === undefined || text === "" ? "<undefined>" : text
+}
+
+const argsToText = (args: string[]) =>
     args
         .join(" ")
         .replaceAll("\\n", "\n")
@@ -313,7 +313,7 @@ const filterResponseText: FilterResponseText = async (text) => {
     return trimmedText
 }
 
-const isCmdExists: IsCmdExists = async (text) => {
+const isCmdExists = (text: string) => {
     const lastBeginIdIndex = text.lastIndexOf(qwqCmdBeginId)
     const lastEndIdIndex = text.lastIndexOf(qwqCmdEndId)
     if (lastBeginIdIndex === -1 || lastEndIdIndex === -1) return false
@@ -321,8 +321,8 @@ const isCmdExists: IsCmdExists = async (text) => {
     else return true
 }
 
-const splitTextAndCmd: SplitTextAndCmd = async (answer) => {
-    const cmdExists = await isCmdExists(answer)
+const splitTextAndCmd = (answer: string) => {
+    const cmdExists = isCmdExists(answer)
     if (!cmdExists) return [answer.trim(), ""]
     const answerSplitedByBeginId = answer.split(qwqCmdBeginId)
     const text =
