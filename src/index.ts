@@ -1,4 +1,4 @@
-import { Either } from "effect"
+import { Either, Match } from "effect"
 import { decodeUnknownEither } from "effect/Schema"
 import { compile, decompile } from "hxqa"
 
@@ -32,7 +32,6 @@ import {
 } from "./templetes"
 
 // Dirty
-type Main = (args: string[]) => Promise<never>
 type Entry = (args: string[]) => Promise<void>
 type AskDebug = (question: string) => Promise<string>
 type GetConfig = () => Promise<Config>
@@ -42,8 +41,6 @@ type RotateThenGetCache = (newMessages: Message[]) => Promise<Message[]>
 type Builder<T> = (question: string, cache: Message[], config: Config, envVars: EnvVar[]) => Promise<T>
 type BuildRequest = Builder<Request>
 type BuildRequestBody = Builder<RequestBoby>
-type BuildMessages = Builder<Message[]>
-type BuildSystemPrompt = (config: Config, envVars: EnvVar[]) => Promise<string>
 type BuildEnvVarsPart = (envVars: EnvVar[]) => Promise<string>
 type Sleep = (ms: number) => Promise<void>
 type ArgsToText = (args: string[]) => Promise<string>
@@ -53,24 +50,30 @@ type FilterResponseText = (text: string) => Promise<string>
 type MessagesToHxqa = (messages: Message[]) => Promise<string>
 type HxqaToMessages = (hxqa: string) => Promise<Message[]>
 
-const main: Main = async (args) => {
+const main = async (args: string[]) => {
     const subCommand = args.at(0)
     const restArgs = args.slice(1)
-    if (restArgs.length <= 0) process.exit()
-    else if (subCommand === "integrate-shell") await integrateShell(restArgs)
-    else if (subCommand === "check-cmd-exist") await checkCmdExist(restArgs)
-    else if (subCommand === "extract-text") await extractText(restArgs)
-    else if (subCommand === "extract-cmd") await extractCommand(restArgs)
-    else if (subCommand === "ask") await ask(restArgs)
-    process.exit()
+    Match.value(subCommand).pipe(
+        Match.when("integrate-shell", _ => integrateShell(restArgs)),
+        Match.when("check-cmd-exist", _ => checkCmdExist(restArgs)),
+        Match.when("extract-text", _ => extractText(restArgs)),
+        Match.when("extract-cmd", _ => extractCommand(restArgs)),
+        Match.when("ask", _ => ask(restArgs)),
+        Match.orElse(_ => showHelp())
+    )
 }
+
+const showHelp = async () => console.log("TODO")
 
 const integrateShell: Entry = async (args) => {
     const shellText =
         args.at(0)
-            .trim()
+            ?.trim()
             .toLowerCase()
-    const shell = shellText === "" ? "<undefined>" : shellText
+    const shell =
+        shellText === undefined
+            || shellText === ""
+            ? "<undefined>" : shellText
     const isExeFile = getIsExeFile()
     const path = getExePathOrSrcDir()
     const shellFunc = buildShellFunc(isExeFile, path, shell)
@@ -200,7 +203,7 @@ const rotateThenGetCache: RotateThenGetCache = async (newMessages) => {
     }
     const cacheHxqa = await cacheFile.text()
     const cache = await hxqaToMessages(cacheHxqa)
-    if (cache.length <= 0 || cache.at(-1).content === qwqMetaTermMsg) {
+    if (cache.length <= 0 || cache.at(-1)!.content === qwqMetaTermMsg) {
         await cacheFile.write(newMessagesHxqa)
         return newMessages
     }
@@ -225,7 +228,7 @@ const buildRequest: BuildRequest = async (question, cache, config, envVars) => {
 }
 
 const buildRequestBody: BuildRequestBody = async (question, cache, config, envVars) => {
-    const messages = await buildMessages(question, cache, config, envVars)
+    const messages = await buildMessages(question, cache, envVars)
     const body = {
         model: config.api.model,
         messages: messages
@@ -233,8 +236,8 @@ const buildRequestBody: BuildRequestBody = async (question, cache, config, envVa
     return body
 }
 
-const buildMessages: BuildMessages = async (question, cache, config, envVars) => {
-    const systemPrompt = await buildSystemPrompt(config, envVars)
+const buildMessages = async (question: string, cache: Message[], envVars: EnvVar[]) => {
+    const systemPrompt = await buildSystemPrompt(envVars)
     const systemMessage = {
         role: "system" as "system",
         content: systemPrompt
@@ -247,7 +250,7 @@ const buildMessages: BuildMessages = async (question, cache, config, envVars) =>
     return messages
 }
 
-const buildSystemPrompt: BuildSystemPrompt = async (config, envVars) => {
+const buildSystemPrompt = async (envVars: EnvVar[]) => {
     const envVarsPart = await buildEnvVarsPart(envVars)
     const systemPrompt = buildSysPrompt(envVarsPart)
     return systemPrompt
@@ -263,7 +266,7 @@ const parseResponseAnthropic = async (
     response: unknown
 ): Promise<Result<string>> =>
     decodeUnknownEither(ResponseResultAnthropicS)(response).pipe(
-        Either.map(res => res.content.at(0).text),
+        Either.map(res => res.content.at(0)!.text),
         Either.mapLeft(err => {
             const qwqErr: QwqError = {
                 stage: "ParsingResponse",
@@ -280,7 +283,7 @@ const parseResponseOpenai = async (
     response: unknown
 ): Promise<Result<string>> =>
     decodeUnknownEither(ResponseResultOpenaiS)(response).pipe(
-        Either.map(res => res.choices.at(0).message.content),
+        Either.map(res => res.choices.at(0)!.message.content),
         Either.mapLeft(err => {
             const qwqErr: QwqError = {
                 stage: "ParsingResponse",
@@ -329,9 +332,9 @@ const splitTextAndCmd: SplitTextAndCmd = async (answer) => {
             .trim()
     const command =
         answerSplitedByBeginId
-            .at(-1)
+            .at(-1)!
             .split(qwqCmdEndId)
-            .at(0)
+            .at(0)!
             .trim()
     return [text, command]
 }
