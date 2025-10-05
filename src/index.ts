@@ -3,7 +3,7 @@ import { decodeUnknownEither } from "effect/Schema"
 import { compile, decompile } from "hxqa"
 
 import type {
-    QwqAnyhowResult as Result,
+    QwqResult,
     QwqError,
     Config,
     Message,
@@ -132,7 +132,7 @@ const askAi = async (
     question: string,
     config: Config,
     envVars: EnvVar[]
-): Promise<Result<string>> => {
+): Promise<QwqResult<string>> => {
     const apiType = config.api.type
     const cache = await rotateThenGetCache([])
     const request = await buildRequest(question, cache, config, envVars)
@@ -229,11 +229,11 @@ const buildRequest: BuildRequest = async (question, cache, config, envVars) => {
 
 const buildRequestBody: BuildRequestBody = async (question, cache, config, envVars) => {
     const messages = await buildMessages(question, cache, envVars)
-    const body = {
+    return {
         model: config.api.model,
+        enable_thinking: false,
         messages: messages
     }
-    return body
 }
 
 const buildMessages = async (question: string, cache: Message[], envVars: EnvVar[]) => {
@@ -264,7 +264,7 @@ const buildEnvVarsPart: BuildEnvVarsPart = async (envVars) => {
 
 const parseResponseAnthropic = async (
     response: unknown
-): Promise<Result<string>> =>
+): Promise<QwqResult<string>> =>
     decodeUnknownEither(ResponseResultAnthropicS)(response).pipe(
         Either.map(res => res.content.at(0)!.text),
         Either.mapLeft(err => {
@@ -281,7 +281,7 @@ const parseResponseAnthropic = async (
 
 const parseResponseOpenai = async (
     response: unknown
-): Promise<Result<string>> =>
+): Promise<QwqResult<string>> =>
     decodeUnknownEither(ResponseResultOpenaiS)(response).pipe(
         Either.map(res => res.choices.at(0)!.message.content),
         Either.mapLeft(err => {

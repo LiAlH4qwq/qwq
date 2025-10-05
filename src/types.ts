@@ -1,7 +1,7 @@
 import * as E from "effect/Either"
 import * as S from "effect/Schema"
 
-export type QwqAnyhowResult<T> = E.Either<T, QwqError>
+export type QwqResult<T> = E.Either<T, QwqError>
 
 export type QwqError = {
     stage: "AskingAi"
@@ -17,6 +17,18 @@ export type QwqError = {
     raw: unknown
 }
 
+export interface Request {
+    method: "POST"
+    headers: Headers,
+    body: string,
+}
+
+export interface RequestBoby {
+    model: string
+    enable_thinking: false
+    messages: Message[]
+}
+
 export interface ConfigApi
     extends S.Schema.Type<typeof ConfigApiS> { }
 
@@ -28,12 +40,6 @@ export interface Config
 
 export interface Message
     extends S.Schema.Type<typeof MessageS> { }
-
-export interface RequestBoby
-    extends S.Schema.Type<typeof RequestBobyS> { }
-
-export interface Request
-    extends S.Schema.Type<typeof RequestS> { headers: Headers }
 
 export interface ResponseResultContentAnthropic
     extends S.Schema<typeof ResponseResultContentAnthropicS> { }
@@ -67,17 +73,6 @@ export const ConfigS = S.Struct({
 export const MessageS = S.Struct({
     role: S.Literal("system", "assistant", "user"),
     content: S.String,
-})
-
-export const RequestBobyS = S.Struct({
-    model: S.String,
-    messages: S.Array(MessageS),
-})
-
-export const RequestS = S.Struct({
-    method: S.Literal("POST"),
-    headers: S.Object,
-    body: S.String,
 })
 
 export const ResponseResultContentAnthropicS = S.Struct({
