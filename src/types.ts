@@ -1,26 +1,14 @@
-import * as E from "effect/Either"
 import * as S from "effect/Schema"
-
-export type QwqResult<T> = E.Either<T, QwqError>
-
-export type QwqError = {
-    stage: "AskingAi"
-    category: "ApiConfigError"
-    what: "UnknownApiType"
-    details: string,
-    raw: undefined
-} | {
-    stage: "ParsingResponse"
-    category: "UnexepectedResponse"
-    what: "UnknownResponseStructure"
-    details: string
-    raw: unknown
-}
 
 export interface Request {
     method: "POST"
-    headers: Headers,
+    headers: RequestHead,
     body: string,
+}
+
+export interface RequestHead {
+    Authorization: `Bearer ${string}`
+    "Content-Type": "application/json"
 }
 
 export interface RequestBoby {
@@ -28,6 +16,8 @@ export interface RequestBoby {
     enable_thinking: false
     messages: Message[]
 }
+
+export type ConfigApiType = typeof ConfigApiTypeS.Type
 
 export interface ConfigApi
     extends S.Schema.Type<typeof ConfigApiS> { }
@@ -37,6 +27,9 @@ export interface ConfigEnvAccess
 
 export interface Config
     extends S.Schema.Type<typeof ConfigS> { }
+
+export interface JsonlLine
+    extends S.Schema.Type<typeof JsonlLineS> { }
 
 export interface Message
     extends S.Schema.Type<typeof MessageS> { }
@@ -53,8 +46,10 @@ export interface ResponseResultChoiceOpenai
 export interface ResponseResultOpenai
     extends S.Schema.Type<typeof ResponseResultOpenaiS> { }
 
+export const ConfigApiTypeS = S.Literal("anthropic", "openai")
+
 export const ConfigApiS = S.Struct({
-    type: S.Literal("anthropic", "openai"),
+    type: ConfigApiTypeS,
     url: S.String,
     key: S.String,
     model: S.String,
@@ -73,6 +68,10 @@ export const ConfigS = S.Struct({
 export const MessageS = S.Struct({
     role: S.Literal("system", "assistant", "user"),
     content: S.String,
+})
+
+export const JsonlLineS = S.Struct({
+    messages: S.Array(MessageS)
 })
 
 export const ResponseResultContentAnthropicS = S.Struct({

@@ -1,3 +1,5 @@
+import { Match } from "effect"
+
 export const qwqCmdBeginId = "QWQ COMMAND BEGIN"
 export const qwqCmdEndId = "QWQ COMMAND END"
 export const qwqMetaTermId = "QWQ META TERMINATE"
@@ -31,12 +33,14 @@ ${qwqCmdEndId}
 ${envVarsPart}
 `.trim()
 
-export const buildDummyAnswer = (question: string) => `
+export const buildDummyAnswer = (envVarsPart: string) => (question: string) => `
 现在是调试模式喵~
 就是……不会真正向AI提问的
 你提出的问题是：${question}
 我在调试模式下回答不了呢
 把配置文件里的debug改成false就能关掉调试模式了喵
+以下是你的环境变量~
+${envVarsPart}
 下面是一条指令建议的实例，用于测试shell集成是否正常喵
 ${qwqCmdBeginId}
 ls
@@ -46,9 +50,11 @@ cat /etc/os-release
 ${qwqCmdEndId}
 `.trim()
 
-export const buildShellFunc = (isExeFile: boolean, path: string, shell: string) => {
-    const startCmd = isExeFile ? path : "bun --silent start"
-    if (shell === "fish") return `
+export const buildShellFunc = (isExeFile: boolean) =>
+    (path: string) => (shell: string) => {
+        const startCmd = isExeFile ? path : "bun --silent start"
+        return Match.value(shell).pipe(
+            Match.when("fish", _ => `
 function qwq
     printf "在想呢……"
     ${isExeFile ? "" : `pushd ${path}`}
@@ -82,8 +88,8 @@ function qwq
     end
     ${isExeFile ? "" : "popd"}
 end
-`.trim()
-    else if (shell === "powershell") return `
+                `.trim()),
+            Match.when("powershell", _ => `
 function qwq {
     Write-Host -NoNewline "在想呢……"
     ${isExeFile ? "" : `Push-Location ${path}`}
@@ -132,6 +138,7 @@ function qwq {
     }
     ${isExeFile ? "" : "Pop-Location"}
 }
-`.trim()
-    else return `暂时还不支持${shell}喵~`
-}
+                `.trim()),
+            Match.orElse(s => `暂时还不支持${s}喵~`)
+        )
+    }

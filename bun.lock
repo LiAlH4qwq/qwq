@@ -5,7 +5,7 @@
       "name": "qwq",
       "dependencies": {
         "effect": "^3.18.1",
-        "hxqa": "^0.2.2",
+        "hxqa": "^0.2.5",
       },
       "devDependencies": {
         "@types/bun": "latest",

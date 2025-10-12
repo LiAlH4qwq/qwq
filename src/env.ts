@@ -3,22 +3,7 @@ export interface EnvVar {
     value: string
 }
 
-// Dirty
-type GetEnvVars = (names: readonly string[]) => EnvVar[]
-type GetExePathOrSrcDir = () => string
-type GetWorkingDir = () => string
-type GetIsExeFile = () => boolean
-type GetRawMainDir = () => string
-type GetRawMainPath = () => string
-type GetRawExecDir = () => string
-type GetRawExecPath = () => string
-
-// Pure
-type DropPathLastOne = (path: string) => string
-type DropPathLastTwo = (path: string) => string
-type DropPathLastN = (path: string, n: number) => string
-
-export const getEnvVars: GetEnvVars = (names) =>
+export const getEnvVars = (names: readonly string[]) =>
     names
         .map(name => {
             const rawValue = Bun.env[name]
@@ -27,30 +12,26 @@ export const getEnvVars: GetEnvVars = (names) =>
             return envVar
         })
 
-export const getExePathOrSrcDir: GetExePathOrSrcDir = () =>
+export const getExePathOrSrcDir = () =>
     getIsExeFile() ? getRawExecPath() : getRawMainDir()
 
-export const getWorkingDir: GetWorkingDir = () =>
+export const getWorkingDir = () =>
     getIsExeFile() ? getRawExecDir() : getRawMainDir()
 
-export const getIsExeFile: GetIsExeFile = () =>
+export const getIsExeFile = () =>
     getRawMainPath().startsWith("/$bunfs/root/")
 
-const getRawMainDir: GetRawMainDir = () =>
-    dropPathLastTwo(getRawMainPath())
+const getRawMainDir = () =>
+    dropPathLastN(2)(getRawMainPath())
 
-const getRawMainPath: GetRawMainPath = () => Bun.main
+const getRawMainPath = () => Bun.main
 
-const getRawExecDir: GetRawExecDir = () =>
-    dropPathLastOne(getRawExecPath())
+const getRawExecDir = () =>
+    dropPathLastN(1)(getRawExecPath())
 
-const getRawExecPath: GetRawExecPath = () => process.execPath
+const getRawExecPath = () => process.execPath
 
-const dropPathLastOne: DropPathLastOne = (path) => dropPathLastN(path, 1)
-
-const dropPathLastTwo: DropPathLastTwo = (path) => dropPathLastN(path, 2)
-
-const dropPathLastN: DropPathLastN = (path, n) =>
+const dropPathLastN = (n: number) => (path: string) =>
     path
         .split("/")
         .slice(0, - n)

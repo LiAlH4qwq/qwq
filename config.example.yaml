@@ -26,6 +26,5 @@ api:
 env_access:
     env_vars:
         - SHELL
-        - USER
         - XDG_SESSION_TYPE
         - XDG_SESSION_DESKTOP
