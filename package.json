@@ -17,7 +17,7 @@
     },
     "scripts": {
         "start": "bun src/index.ts",
-        "check": "biome format --write && biome check",
-        "pack": "bun build.ts"
+        "check": "tsc && biome format --write && biome check",
+        "pack": "bun run check && bun run build.ts"
     }
 }

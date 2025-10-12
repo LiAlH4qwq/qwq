@@ -17,6 +17,7 @@
         "declaration": true,
         "emitDeclarationOnly": true,
         "noEmitOnError": true,
+        "noEmit": true,
         "allowJs": false,
         "erasableSyntaxOnly": false,
         "module": "preserve",
