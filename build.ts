@@ -9,33 +9,39 @@ const targets = [
     "darwin-x64-legacy",
     "darwin-arm64",
     "windows-x64",
-    "windows-x64-legacy"
+    "windows-x64-legacy",
 ] as const
 
 type Main = () => Promise<never>
 type TargetNameToBunReadable = (target: string) => string
 type TargetNameToExecutableName = (target: string) => string
 
-const targetNameToBunReadable: TargetNameToBunReadable = (target) => {
-    const part = target.endsWith("legacy") ?
-        target.replaceAll("legacy", "baseline") :
-        `${target}-modern`
+const targetNameToBunReadable: TargetNameToBunReadable = target => {
+    const part = target.endsWith("legacy")
+        ? target.replaceAll("legacy", "baseline")
+        : `${target}-modern`
     return `bun-${part}`
 }
 
-const targetNameToExecutableName: TargetNameToExecutableName = (target) => {
-    const part = target.startsWith("darwin") ? `${target}.app` :
-        target.startsWith("windows") ? `${target}.exe` :
-            target
+const targetNameToExecutableName: TargetNameToExecutableName = target => {
+    const part = target.startsWith("darwin")
+        ? `${target}.app`
+        : target.startsWith("windows")
+          ? `${target}.exe`
+          : target
     return `qwq-${part}`
 }
 
 const main: Main = async () => {
     await Bun.$`mkdir -p target`
-    await Promise.all(targets.map(async target =>
-        await Bun.$`bun build --compile --minify --sourcemap \
+    await Promise.all(
+        targets.map(
+            async target =>
+                await Bun.$`bun build --compile --minify --sourcemap \
         --target=${targetNameToBunReadable(target)} \
-        --outfile=target/${targetNameToExecutableName(target)} src/index.ts`))
+        --outfile=target/${targetNameToExecutableName(target)} src/index.ts`,
+        ),
+    )
     process.exit()
 }
 

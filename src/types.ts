@@ -2,8 +2,8 @@ import * as S from "effect/Schema"
 
 export interface Request {
     method: "POST"
-    headers: RequestHead,
-    body: string,
+    headers: RequestHead
+    body: string
 }
 
 export interface RequestHead {
@@ -19,32 +19,28 @@ export interface RequestBoby {
 
 export type ConfigApiType = typeof ConfigApiTypeS.Type
 
-export interface ConfigApi
-    extends S.Schema.Type<typeof ConfigApiS> { }
+export interface ConfigApi extends S.Schema.Type<typeof ConfigApiS> {}
 
 export interface ConfigEnvAccess
-    extends S.Schema.Type<typeof ConfigEnvAccessS> { }
+    extends S.Schema.Type<typeof ConfigEnvAccessS> {}
 
-export interface Config
-    extends S.Schema.Type<typeof ConfigS> { }
+export interface Config extends S.Schema.Type<typeof ConfigS> {}
 
-export interface JsonlLine
-    extends S.Schema.Type<typeof JsonlLineS> { }
+export interface JsonlLine extends S.Schema.Type<typeof JsonlLineS> {}
 
-export interface Message
-    extends S.Schema.Type<typeof MessageS> { }
+export interface Message extends S.Schema.Type<typeof MessageS> {}
 
 export interface ResponseResultContentAnthropic
-    extends S.Schema<typeof ResponseResultContentAnthropicS> { }
+    extends S.Schema<typeof ResponseResultContentAnthropicS> {}
 
 export interface ResponseResultAnthropic
-    extends S.Schema<typeof ResponseResultAnthropicS> { }
+    extends S.Schema<typeof ResponseResultAnthropicS> {}
 
 export interface ResponseResultChoiceOpenai
-    extends S.Schema.Type<typeof ResponseResultChoiceOpenaiS> { }
+    extends S.Schema.Type<typeof ResponseResultChoiceOpenaiS> {}
 
 export interface ResponseResultOpenai
-    extends S.Schema.Type<typeof ResponseResultOpenaiS> { }
+    extends S.Schema.Type<typeof ResponseResultOpenaiS> {}
 
 export const ConfigApiTypeS = S.Literal("anthropic", "openai")
 
@@ -71,7 +67,7 @@ export const MessageS = S.Struct({
 })
 
 export const JsonlLineS = S.Struct({
-    messages: S.Array(MessageS)
+    messages: S.Array(MessageS),
 })
 
 export const ResponseResultContentAnthropicS = S.Struct({

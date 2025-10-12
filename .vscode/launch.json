@@ -10,10 +10,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "src/index.ts",
-            "args": [
-                "ask",
-                "你好呀"
-            ],
+            "args": ["ask", "你好呀"],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false,
             "watchMode": false

@@ -1,21 +1,22 @@
 {
-  "name": "qwq",
-  "version": "v0.1",
-  "module": "index.ts",
-  "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "effect": "^3.18.1",
-    "hxqa": "^0.2.5"
-  },
-  "scripts": {
-    "start": "bun src/index.ts",
-    "pack": "bun build.ts"
-  }
+    "name": "qwq",
+    "version": "v0.1",
+    "module": "index.ts",
+    "type": "module",
+    "private": true,
+    "devDependencies": {
+        "@biomejs/biome": "^2.2.5",
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5.9.2"
+    },
+    "dependencies": {
+        "effect": "^3.18.1",
+        "hxqa": "^0.2.5"
+    },
+    "scripts": {
+        "start": "bun src/index.ts",
+        "pack": "bun build.ts"
+    }
 }
