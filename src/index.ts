@@ -11,7 +11,6 @@ import { compile, decompile } from "hxqa"
 
 import type {
     ConfigApi,
-    ConfigApiType,
     Message,
     Request,
     RequestBoby,
@@ -156,7 +155,7 @@ const updateCache = (msgs: Message[]) => Effect.gen(function* () {
         Effect.flatMap(hxqaToMsgs),
         Effect.orElse(() => writeFile(cacheFile)("").pipe(Effect.as([])))
     )
-    const newCache = [...cache.slice(0, - 2 * (10 - 1)), ...msgs]
+    const newCache = [...cache.slice(- 2 * (10 - 1)), ...msgs]
     yield* msgsToHxqa(newCache).pipe(Effect.flatMap(writeFile(cacheFile)))
 })
 
