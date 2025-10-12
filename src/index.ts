@@ -5,7 +5,8 @@ import {
     Match,
     Schema,
     String,
-    Boolean
+    Boolean,
+    ParseResult
 } from "effect"
 import { compile, decompile } from "hxqa"
 
@@ -53,12 +54,14 @@ const main = (args: string[]) => {
 }
 
 const showHelp = () => Console.log(`
-This binary is not intended for directly use, \
-please refer to the document for the usage.
+不推荐直接使用这个二进制文件呢，建议根据文档配置 shell 集成喵
+不过如果要直接使用的话，这是帮助：
+Usage: <startCmd> <ask | extract-text | extract-cmd | check-cmd-exist | integrate-shell> <restArgs...>
+嘛~ 不想写帮助了 pwq
 `.trim())
 
 const integrateShell = (args: string[]) => pipe(
-    buildShellFunc(getIsExeFile())(getExePathOrSrcDir())(argsToShellText(args)),
+    buildShellFunc(getIsExeFile())(getExePathOrSrcDir())(argsToShellName(args)),
     Console.log
 )
 
@@ -102,9 +105,10 @@ const askDebug = (envVars: EnvVar[]) => (question: string) => pipe(
 const askAi = (configApi: ConfigApi) => (envVars: EnvVar[]) =>
     (question: string) => Effect.gen(function* () {
         const cache = yield* getCache()
-        const req = yield* buildRequest(configApi)(cache)(envVars)(question)
-        const res = yield* request(configApi.url)(req)
-        const resJson = yield* responseJson(res)
+        const req = buildRequest(configApi)(cache)(envVars)(question)
+        const res = yield* makeRequest(configApi.url)(req)
+        const resText = yield* responseText(res)
+        const resJson = yield* json2Data(resText)
         const ans = yield* Match.value(configApi.type).pipe(
             Match.when("anthropic", _ => parseResponseAnthropic(resJson)),
             Match.when("openai", _ => parseResponseOpenai(resJson)),
@@ -127,9 +131,12 @@ const askAi = (configApi: ConfigApi) => (envVars: EnvVar[]) =>
 const getConfig = () =>
     Effect.succeed(`${getWorkingDir()}/config.yaml`).pipe(
         Effect.flatMap(readFile),
-        Effect.flatMap(fromYaml),
-        Effect.flatMap(Schema.decodeUnknown(ConfigS))
-    )
+        Effect.flatMap(yaml2Data),
+        Effect.flatMap(Schema.decodeUnknown(ConfigS)),
+        Effect.mapError(e =>
+            `啊，配置文件好像有问题呢，要不查下文档看下怎么配置喵：
+${typeof e === "string" ? e : ParseResult.TreeFormatter.formatErrorSync(e)}`
+        ))
 
 const getCache = () => Effect.gen(function* () {
     const cacheFile = fileFromPath(`${getWorkingDir()}/cache.hxqa`)
@@ -139,7 +146,9 @@ const getCache = () => Effect.gen(function* () {
         return []
     }
     return yield* fileText(cacheFile).pipe(
-        Effect.flatMap(hxqaToMsgs),
+        Effect.flatMap(hxqa2Msgs),
+        Effect.tapError(e =>
+            Console.log(`啊，缓存文件疑似损坏了，我就清空缓存啦：\n${e}`)),
         Effect.orElse(() => writeFile(cacheFile)("").pipe(Effect.as([])))
     )
 })
@@ -152,23 +161,25 @@ const updateCache = (msgs: Message[]) => Effect.gen(function* () {
         return
     }
     const cache = yield* fileText(cacheFile).pipe(
-        Effect.flatMap(hxqaToMsgs),
+        Effect.flatMap(hxqa2Msgs),
+        Effect.tapError(e =>
+            Console.log(`啊，缓存文件疑似损坏了，我就清空缓存啦：\n${e}`)),
         Effect.orElse(() => writeFile(cacheFile)("").pipe(Effect.as([])))
     )
     const newCache = [...cache.slice(- 2 * (10 - 1)), ...msgs]
-    yield* msgsToHxqa(newCache).pipe(Effect.flatMap(writeFile(cacheFile)))
+    yield* msgs2Hxqa(newCache).pipe(Effect.flatMap(writeFile(cacheFile)))
 })
 
 const buildRequest = (configApi: ConfigApi) => (cache: readonly Message[]) =>
-    (envVars: EnvVar[]) => (question: string) =>
-        Effect.succeed(buildRequestBody(configApi.model)(cache)(envVars)(question)).pipe(
-            Effect.flatMap(toJson),
-            Effect.map(body => ({
-                method: "POST",
-                headers: buildRequestHead(configApi.key),
-                body
-            } as Request))
-        )
+    (envVars: EnvVar[]) => (question: string) => pipe(
+        buildRequestBody(configApi.model)(cache)(envVars)(question),
+        data2Json,
+        body => ({
+            method: "POST",
+            headers: buildRequestHead(configApi.key),
+            body
+        } as Request)
+    )
 
 const buildRequestHead = (apiKey: string) => ({
     Authorization: `Bearer ${apiKey}`,
@@ -209,16 +220,20 @@ const buildEnvVarsPart = (envVars: EnvVar[]) =>
 const parseResponseAnthropic = (res: unknown) =>
     Schema.decodeUnknown(ResponseResultAnthropicS)(res).pipe(
         Effect.map(val => val.content.at(0)!.text),
-        Effect.map(filterResponseText)
+        Effect.map(processAnsText),
+        Effect.mapError(ParseResult.TreeFormatter.formatErrorSync),
+        Effect.mapError(e => `这个服务器答复我看不太懂呢……\n${res}\n${e}`)
     )
 
 const parseResponseOpenai = (res: unknown) =>
     Schema.decodeUnknown(ResponseResultOpenaiS)(res).pipe(
         Effect.map(val => val.choices.at(0)!.message.content),
-        Effect.map(filterResponseText)
+        Effect.map(processAnsText),
+        Effect.mapError(ParseResult.TreeFormatter.formatErrorSync),
+        Effect.mapError(e => `这个服务器答复我看不太懂呢……\n${res}\n${e}`)
     )
 
-const argsToShellText = (args: string[]) => {
+const argsToShellName = (args: string[]) => {
     const text = args.at(0)?.trim().toLowerCase()
     return text === undefined || text === "" ? "<undefined>" : text
 }
@@ -229,7 +244,7 @@ const argsToText = (args: string[]) =>
         .replaceAll("\\n", "\n")
         .trim()
 
-const filterResponseText = (text: string) => pipe(
+const processAnsText = (text: string) => pipe(
     text,
     String.trim,
     t => t.startsWith(qwqMetaTermId) || t.endsWith(qwqMetaTermId)
@@ -271,10 +286,13 @@ const fileFromPath = (path: string) =>
 const fileExist = (file: Bun.BunFile) =>
     Effect.promise(() => file.exists())
 
+// 如果文件存在但是没有权限读写，进程也是会直接崩溃的
+// 所以 Effect.try 没有意义 qeq
+
 const fileText = (file: Bun.BunFile) =>
     fileExist(file).pipe(Effect.flatMap(exists => exists
         ? Effect.promise(() => file.text())
-        : Effect.fail("CouldntReadFile")
+        : Effect.fail("FileNotFound")
     ))
 
 const readFile = (path: string) => pipe(
@@ -283,73 +301,76 @@ const readFile = (path: string) => pipe(
     fileText
 )
 
-const writeFile = (path: string | Bun.BunFile) => (data: string) =>
-    Effect.tryPromise({
-        try: () => Bun.write(path, data),
-        catch: (_) => "CouldntWriteFile"
-    })
+const writeFile = (pathOrFile: string | Bun.BunFile) => (data: string) =>
+    Effect.promise(() => Bun.write(pathOrFile, data))
 
-const msgsToHxqa = (msgs: Message[]) => Effect.succeed(msgs).pipe(
+const msgs2Hxqa = (msgs: Message[]) => Effect.succeed(msgs).pipe(
     Effect.map(msgs => ({ messages: msgs })),
-    Effect.flatMap(toJson),
-    Effect.flatMap(toHxqa)
+    Effect.map(data2Json),
+    Effect.flatMap(jsonl2Hxqa)
 )
 
-const hxqaToMsgs = (hxqa: string) => fromHxqa(hxqa).pipe(
-    Effect.flatMap(fromJson),
+const hxqa2Msgs = (hxqa: string) => hxqa2Jsonl(hxqa).pipe(
+    Effect.flatMap(json2Data),
     Effect.flatMap(Schema.decodeUnknown(JsonlLineS)),
     Effect.map(jsonlLine => jsonlLine.messages)
 )
 
-const request = (url: string) => (data: Request) =>
+// Bun 的 fetch 就算出错也是没法捕获的 pwq
+
+const makeRequest = (url: string) => (data: Request) =>
     Effect.promise(() => fetch(url, data as unknown as Record<string, string>))
 
-const responseJson = (res: Response) =>
-    Effect.tryPromise({
-        try: () => res.json() as Promise<unknown>,
-        catch: _ => "CouldntReadResponse"
-    })
+const responseText = (res: Response) =>
+    Effect.promise(() => res.text())
 
-const fromYaml = (yaml: string) =>
+const hxqa2Jsonl = (hxqa: string) => pipe(
+    hxqa,
+    compile,
+    hxqaResult2Effect
+)
+
+const jsonl2Hxqa = (jsonl: string) => pipe(
+    jsonl,
+    decompile,
+    hxqaResult2Effect
+)
+
+const hxqaResult2Effect = (
+    res: { pass: true, value: string }
+        | { pass: false, error: object }
+) =>
+    res.pass
+        ? Effect.succeed(res.value)
+        : Effect.fail(pipe(res.error, data2JsonPretty))
+
+// 啊，Bun 上的 Bun.YAML.parse 和 JSON.parse 的错误能捕获
+// 但没法访问到任何错误信息
+// 所以只能返回一个很模糊的错误信息了
+
+const yaml2Data = (yaml: string) =>
     Effect.try({
         try: () => Bun.YAML.parse(yaml),
         catch: _ => "CouldntParseYaml"
     })
 
-const fromJson = (json: string) =>
+const json2Data = (json: string) =>
     Effect.try({
         try: () => JSON.parse(json) as unknown,
         catch: _ => "CouldntParseJson"
     })
 
-const toJson = (data: unknown) =>
-    Effect.try({
-        try: () => JSON.stringify(data),
-        catch: _ => "CouldntGenerateJson"
-    })
+// 呐，在 Bun 上，JSON.stringify 的错误是没法被 try 捕获的
+// 所以这两个函数就不用 Effect.try 啦
 
-const fromHxqa = (hxqa: string) => pipe(
-    hxqa,
-    compile,
-    fromHxqaResult
-)
+const data2JsonPretty = (data: unknown) =>
+    JSON.stringify(data, undefined, 2)
 
-const toHxqa = (jsonl: string) => pipe(
-    jsonl,
-    decompile,
-    fromHxqaResult
-)
-
-const fromHxqaResult = (
-    res: { pass: true, value: string }
-        | { pass: false, error: unknown }
-) =>
-    res.pass
-        ? Effect.succeed(res.value)
-        : Effect.fail(res.error)
+const data2Json = (data: unknown) =>
+    JSON.stringify(data)
 
 if (import.meta.main)
     main(Bun.argv.slice(2)).pipe(
-        Effect.catchAll(e => Console.log("啊！出错了呢：\n", e)),
+        Effect.catchAll(e => Console.log("好像出错了呢：\n", e)),
         Effect.runFork
     )
