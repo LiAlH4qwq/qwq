@@ -105,10 +105,6 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
 若通过源码安装，请替换下文中 `<启动指令>` 为 `bun start`
 
-### Fish Shell
-
-> <启动指令> integrate-shell fish > ~/.config/fish/conf.d/qwq.fish
-
 ### Powershell
 
 - Linux 用户
@@ -123,6 +119,16 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
     > <启动指令> integrate-shell powershell
 
+### Fish Shell
+
+> <启动指令> integrate-shell fish > ~/.config/fish/conf.d/qwq.fish
+
+### Posix Shell (Bash / Dash / Zsh / etc.)
+
+运行以下指令并粘贴输出到你的 Shell Profile （如 `~/.bashrc`、`~/.zshrc`）中
+
+> bun src/index.ts integrate-shell sh
+
 ## 然后……
 
 然后就可以在命令行中输入 `qwq <想问的东西>` 来对话啦！
@@ -132,6 +138,6 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 - [x] 支持常见 API 格式
 - [x] 支持获取系统环境变量信息
 - [x] 支持记忆（连续对话）功能
-- [ ] 支持 POSIX SHELL (Bash、Zsh、etc...) 集成
+- [x] 支持 POSIX SHELL (Bash、Zsh、etc...) 集成
 - [ ] 支持推理模型
 - [ ] 支持图文生文模型

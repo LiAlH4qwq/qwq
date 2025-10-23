@@ -248,8 +248,7 @@ const argsToShellName = (args: string[]) => {
     return text === undefined || text === "" ? "<undefined>" : text
 }
 
-const argsToText = (args: string[]) =>
-    args.join(" ").replaceAll("\\n", "\n").trim()
+const argsToText = (args: string[]) => args.join(" ").trim()
 
 const processAnsText = (text: string) =>
     pipe(text, String.trim, t =>

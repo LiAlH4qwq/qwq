@@ -56,45 +56,18 @@ export const buildShellFunc =
     (isExeFile: boolean) => (path: string) => (shell: string) => {
         const startCmd = isExeFile ? path : "bun --silent start"
         return Match.value(shell).pipe(
-            Match.when("fish", _ =>
-                `
-function qwq
-    printf "在想呢……"
-    ${isExeFile ? "" : `pushd ${path}`}
-    set -l answer (${startCmd} ask $argv | string collect -a | string trim | string collect -a)
-    set -l isCmdExists (${startCmd} check-cmd-exist $answer | string collect -a | string trim | string collect -a)
-    set -l text (${startCmd} extract-text $answer | string collect -a | string trim | string collect -a)
-    printf "\\n"
-    if [ $isCmdExists = "true" ]
-        set -l cmd (${startCmd} extract-cmd $answer | string collect -a | string trim | string collect -a)
-        printf "%s\\n" $text
-        printf "\\n"
-        printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\n"
-        printf "%s\\n" $cmd
-        printf "\\n"
-        while true
-            read -lP "你的选择：" choice
-            switch $choice
-                case "y" "yes" "Y" "Yes" "YES"
-                    printf "好耶！\\n"
-                    printf "%s\\n" $cmd | source
-                    break
-                case "n" "no" "N" "No" "NO" ""
-                    printf "指令没有执行哦~\\n"
-                    break
-                case "*"
-                    printf "我不太能看懂你的选择呢……\\n"
-            end
-        end
-    else
-        printf "%s\\n" $text
-    end
-    ${isExeFile ? "" : "popd"}
-end
-                `.trim(),
-            ),
             Match.when("powershell", _ =>
-                `
+                buildPsFunc(isExeFile)(path)(startCmd),
+            ),
+            Match.when("fish", _ => buildFishFunc(isExeFile)(path)(startCmd)),
+            Match.when("sh", _ => buildShFunc(isExeFile)(path)(startCmd)),
+            Match.orElse(s => `暂时还不支持${s}喵~`),
+        )
+    }
+
+const buildPsFunc =
+    (isExeFile: boolean) => (path: string) => (startCmd: string) =>
+        `
 function qwq {
     Write-Host -NoNewline "在想呢……"
     ${isExeFile ? "" : `Push-Location ${path}`}
@@ -143,8 +116,98 @@ function qwq {
     }
     ${isExeFile ? "" : "Pop-Location"}
 }
-                `.trim(),
-            ),
-            Match.orElse(s => `暂时还不支持${s}喵~`),
-        )
+`.trim()
+
+const buildFishFunc =
+    (isExeFile: boolean) => (path: string) => (startCmd: string) =>
+        `
+function qwq
+    printf "在想呢……"
+    ${isExeFile ? "" : `pushd ${path}`}
+    set -l answer (${startCmd} ask $argv | string collect -a | string trim | string collect -a)
+    set -l isCmdExists (${startCmd} check-cmd-exist $answer | string collect -a | string trim | string collect -a)
+    set -l text (${startCmd} extract-text $answer | string collect -a | string trim | string collect -a)
+    printf "\\n"
+    if [ $isCmdExists = "true" ]
+        set -l cmd (${startCmd} extract-cmd $answer | string collect -a | string trim | string collect -a)
+        printf "%s\\n" $text
+        printf "\\n"
+        printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\n"
+        printf "%s\\n" $cmd
+        printf "\\n"
+        while true
+            read -lP "你的选择：" choice
+            switch $choice
+                case "y" "yes" "Y" "Yes" "YES"
+                    printf "好耶！\\n"
+                    printf "%s\\n" $cmd | source
+                    break
+                case "n" "no" "N" "No" "NO" ""
+                    printf "指令没有执行哦~\\n"
+                    break
+                case "*"
+                    printf "我不太能看懂你的选择呢……\\n"
+            end
+        end
+    else
+        printf "%s\\n" $text
+    end
+    ${isExeFile ? "" : "popd"}
+end
+`.trim()
+
+const buildShFunc =
+    (isExeFile: boolean) => (path: string) => (startCmd: string) =>
+        `
+qwq() {
+    printf "在想呢……"\
+    ${
+        isExeFile
+            ? ""
+            : `
+    local prevDir
+    prevDir="${path}"
+    cd "$prevDir"`
     }
+    local answer
+    answer="$(${startCmd} ask "$@")"
+    local isCmdExists
+    isCmdExists="$(${startCmd} check-cmd-exist "$answer")"
+    local text
+    text="$(${startCmd} extract-text "$answer")"
+    printf "\\\\n"
+    if [ "$isCmdExists" = "true" ]
+    then
+        local cmd
+        cmd="$(${startCmd} extract-cmd "$answer")"
+        printf "%s\\\\n" "$text"
+        printf "\\\\n"
+        printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\\\n"
+        printf "%s\\\\n" "$cmd"
+        printf "\\\\n"
+        while true
+        do
+            printf "你的选择："
+            local choice
+            read -r choice
+            case "$choice" in
+                (y|yes|Y|Yes|YES)
+                    printf "好耶！\\\\n"
+                    eval "$cmd"
+                    break
+                    ;;
+                (n|no|N|No|NO|"")
+                    printf "指令没有执行哦~\\\\n"
+                    break
+                    ;;
+                (*)
+                    printf "我不太能看懂你的选择呢……\\\\n"
+                    ;;
+            esac
+        done
+    else
+        printf "%s\\\\n" "$text"
+    fi
+    ${isExeFile ? "" : `cd "$prevDir"`}
+}
+`.trim()
