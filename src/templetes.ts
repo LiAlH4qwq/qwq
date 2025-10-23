@@ -166,8 +166,8 @@ qwq() {
             ? ""
             : `
     local prevDir
-    prevDir="${path}"
-    cd "$prevDir"`
+    prevDir="$PWD"
+    cd "${path}"`
     }
     local answer
     answer="$(${startCmd} ask "$@")"

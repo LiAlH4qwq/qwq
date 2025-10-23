@@ -127,7 +127,7 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
 运行以下指令并粘贴输出到你的 Shell Profile （如 `~/.bashrc`、`~/.zshrc`）中
 
-> bun src/index.ts integrate-shell sh
+> <启动指令> integrate-shell sh
 
 ## 然后……
 
