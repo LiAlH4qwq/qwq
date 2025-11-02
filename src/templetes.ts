@@ -226,7 +226,7 @@ qwq() {
         isExeFile
             ? ""
             : `
-        cd "$_qwq_prevDir"`
+    cd "$_qwq_prevDir"`
     }
 }
 `.trim()

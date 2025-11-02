@@ -22,6 +22,11 @@ api:
 #    key: YOUR_API_TOKEN
 #    model: qwen2.5:latest
 
+# 上下文记忆功能
+memory:
+    enable: true
+    length: 10
+
 # 允许访问的环境变量
 env_access:
     env_vars:

@@ -26,6 +26,7 @@ import {
     qwqMetaTermMsg,
 } from "./templetes"
 import type {
+    Config,
     ConfigApi,
     Message,
     Request,
@@ -92,26 +93,26 @@ const ask = (args: string[]) =>
         const question = argsToText(args)
         return yield* Boolean.match(config.debug, {
             onTrue: () => askDebug(envVars)(question),
-            onFalse: () => askAi(config.api)(envVars)(question),
+            onFalse: () => askAi(config)(envVars)(question),
         })
     })
 
 const askDebug = (envVars: EnvVar[]) => (question: string) =>
     pipe(buildDummyAnswer(buildEnvVarsPart(envVars))(question), Console.log)
 
-const askAi =
-    (configApi: ConfigApi) => (envVars: EnvVar[]) => (question: string) =>
-        Effect.gen(function* () {
-            const cache = yield* getCache()
-            const req = buildRequest(configApi)(cache)(envVars)(question)
-            const res = yield* makeRequest(configApi.url)(req)
-            const resText = yield* responseText(res)
-            const resJson = yield* json2Data(resText)
-            const ans = yield* Match.value(configApi.type).pipe(
-                Match.when("anthropic", _ => parseResponseAnthropic(resJson)),
-                Match.when("openai", _ => parseResponseOpenai(resJson)),
-                Match.exhaustive,
-            )
+const askAi = (config: Config) => (envVars: EnvVar[]) => (question: string) =>
+    Effect.gen(function* () {
+        const cache = config.memory.enable ? yield* getCache() : []
+        const req = buildRequest(config.api)(cache)(envVars)(question)
+        const res = yield* makeRequest(config.api.url)(req)
+        const resText = yield* responseText(res)
+        const resJson = yield* json2Data(resText)
+        const ans = yield* Match.value(config.api.type).pipe(
+            Match.when("anthropic", _ => parseResponseAnthropic(resJson)),
+            Match.when("openai", _ => parseResponseOpenai(resJson)),
+            Match.exhaustive,
+        )
+        if (config.memory.enable) {
             const curQa = [
                 {
                     role: "user",
@@ -122,9 +123,10 @@ const askAi =
                     content: ans,
                 },
             ] as Message[]
-            yield* updateCache(curQa)
-            yield* Console.log(ans)
-        })
+            yield* updateCache(config.memory.length)(curQa)
+        }
+        yield* Console.log(ans)
+    })
 
 const getConfig = () =>
     Effect.succeed(`${getWorkingDir()}/config.yaml`).pipe(
@@ -155,7 +157,7 @@ const getCache = () =>
         )
     })
 
-const updateCache = (msgs: Message[]) =>
+const updateCache = (length: number) => (msgs: Message[]) =>
     Effect.gen(function* () {
         if (msgs.length <= 0) return
         const cacheFile = fileFromPath(`${getWorkingDir()}/cache.hxqa`)
@@ -170,7 +172,7 @@ const updateCache = (msgs: Message[]) =>
             ),
             Effect.orElse(() => writeFile(cacheFile)("").pipe(Effect.as([]))),
         )
-        const newCache = [...cache.slice(-2 * (10 - 1)), ...msgs]
+        const newCache = [...cache.slice(-2 * (length - 1)), ...msgs]
         yield* msgs2Hxqa(newCache).pipe(Effect.flatMap(writeFile(cacheFile)))
     })
 

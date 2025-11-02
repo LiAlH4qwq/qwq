@@ -21,6 +21,8 @@ export type ConfigApiType = typeof ConfigApiTypeS.Type
 
 export interface ConfigApi extends S.Schema.Type<typeof ConfigApiS> {}
 
+export interface ConfigMemory extends S.Schema.Type<typeof ConfigMemoryS> {}
+
 export interface ConfigEnvAccess
     extends S.Schema.Type<typeof ConfigEnvAccessS> {}
 
@@ -51,6 +53,11 @@ export const ConfigApiS = S.Struct({
     model: S.String,
 })
 
+export const ConfigMemoryS = S.Struct({
+    enable: S.Boolean,
+    length: S.Int,
+})
+
 export const ConfigEnvAccessS = S.Struct({
     env_vars: S.Array(S.String),
 })
@@ -58,6 +65,7 @@ export const ConfigEnvAccessS = S.Struct({
 export const ConfigS = S.Struct({
     debug: S.Boolean,
     api: ConfigApiS,
+    memory: ConfigMemoryS,
     env_access: ConfigEnvAccessS,
 })
 
