@@ -37,7 +37,7 @@ const main: Main = async () => {
     await Promise.all(
         targets.map(
             async target =>
-                await Bun.$`bun build --compile --minify --sourcemap \
+                await Bun.$`bun build --compile --minify --bytecode --sourcemap \
         --target=${targetNameToBunReadable(target)} \
         --outfile=target/${targetNameToExecutableName(target)} src/index.ts`,
         ),

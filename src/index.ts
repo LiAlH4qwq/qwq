@@ -1,5 +1,4 @@
 import {
-    Boolean,
     Console,
     Effect,
     Match,
@@ -91,10 +90,9 @@ const ask = (args: string[]) =>
         const config = yield* getConfig()
         const envVars = getEnvVars(config.env_access.env_vars)
         const question = argsToText(args)
-        return yield* Boolean.match(config.debug, {
-            onTrue: () => askDebug(envVars)(question),
-            onFalse: () => askAi(config)(envVars)(question),
-        })
+        return yield* config.debug
+            ? askDebug(envVars)(question)
+            : askAi(config)(envVars)(question)
     })
 
 const askDebug = (envVars: EnvVar[]) => (question: string) =>
