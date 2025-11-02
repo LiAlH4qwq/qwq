@@ -221,7 +221,12 @@ qwq() {
         done
     else
         printf "%s\\\\n" "$_qwq_text"
-    fi
-    ${isExeFile ? "" : `cd "$_qwq_prevDir"`}
+    fi\
+    ${
+        isExeFile
+            ? ""
+            : `
+        cd "$_qwq_prevDir"`
+    }
 }
 `.trim()
