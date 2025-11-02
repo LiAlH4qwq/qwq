@@ -69,8 +69,13 @@ const buildPsFunc =
     (isExeFile: boolean) => (path: string) => (startCmd: string) =>
         `
 function qwq {
-    Write-Host -NoNewline "在想呢……"
-    ${isExeFile ? "" : `Push-Location ${path}`}
+    Write-Host -NoNewline "在想呢……"\
+    ${
+        isExeFile
+            ? ""
+            : `
+    Push-Location ${path}`
+    }
     $answer = (${startCmd} ask $Args | Out-String).Trim()
     $isCmdExists = (${startCmd} check-cmd-exist $answer | Out-String).Trim()
     $text = (${startCmd} extract-text $answer | Out-String).Trim()
@@ -113,8 +118,13 @@ function qwq {
         }
     } else {
         Write-Host $text
+    }\
+    ${
+        isExeFile
+            ? ""
+            : `
+    Pop-Location`
     }
-    ${isExeFile ? "" : "Pop-Location"}
 }
 `.trim()
 
@@ -122,8 +132,13 @@ const buildFishFunc =
     (isExeFile: boolean) => (path: string) => (startCmd: string) =>
         `
 function qwq
-    printf "在想呢……"
-    ${isExeFile ? "" : `pushd ${path}`}
+    printf "在想呢……"\
+    ${
+        isExeFile
+            ? ""
+            : `
+    pushd ${path}`
+    }
     set -l answer (${startCmd} ask $argv | string collect -a | string trim | string collect -a)
     set -l isCmdExists (${startCmd} check-cmd-exist $answer | string collect -a | string trim | string collect -a)
     set -l text (${startCmd} extract-text $answer | string collect -a | string trim | string collect -a)
@@ -151,8 +166,13 @@ function qwq
         end
     else
         printf "%s\\n" $text
-    end
-    ${isExeFile ? "" : "popd"}
+    end\
+    ${
+        isExeFile
+            ? ""
+            : `
+    popd`
+    }
 end
 `.trim()
 
@@ -165,35 +185,29 @@ qwq() {
         isExeFile
             ? ""
             : `
-    local prevDir
-    prevDir="$PWD"
+    _qwq_prevDir="$PWD"
     cd "${path}"`
     }
-    local answer
-    answer="$(${startCmd} ask "$@")"
-    local isCmdExists
-    isCmdExists="$(${startCmd} check-cmd-exist "$answer")"
-    local text
-    text="$(${startCmd} extract-text "$answer")"
+    _qwq_answer="$(${startCmd} ask "$@")"
+    _qwq_isCmdExists="$(${startCmd} check-cmd-exist "$_qwq_answer")"
+    _qwq_text="$(${startCmd} extract-text "$_qwq_answer")"
     printf "\\\\n"
-    if [ "$isCmdExists" = "true" ]
+    if [ "$_qwq_isCmdExists" = "true" ]
     then
-        local cmd
-        cmd="$(${startCmd} extract-cmd "$answer")"
-        printf "%s\\\\n" "$text"
+        _qwq_cmd="$(${startCmd} extract-cmd "$_qwq_answer")"
+        printf "%s\\\\n" "$_qwq_text"
         printf "\\\\n"
         printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\\\n"
-        printf "%s\\\\n" "$cmd"
+        printf "%s\\\\n" "$_qwq_cmd"
         printf "\\\\n"
         while true
         do
             printf "你的选择："
-            local choice
-            read -r choice
-            case "$choice" in
+            read -r _qwq_choice
+            case "$_qwq_choice" in
                 (y|yes|Y|Yes|YES)
                     printf "好耶！\\\\n"
-                    eval "$cmd"
+                    eval "$_qwq_cmd"
                     break
                     ;;
                 (n|no|N|No|NO|"")
@@ -206,8 +220,8 @@ qwq() {
             esac
         done
     else
-        printf "%s\\\\n" "$text"
+        printf "%s\\\\n" "$_qwq_text"
     fi
-    ${isExeFile ? "" : `cd "$prevDir"`}
+    ${isExeFile ? "" : `cd "$_qwq_prevDir"`}
 }
 `.trim()
