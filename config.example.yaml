@@ -30,6 +30,5 @@ memory:
 # 允许访问的环境变量
 env_access:
     env_vars:
-        - SHELL
         - XDG_SESSION_TYPE
         - XDG_SESSION_DESKTOP

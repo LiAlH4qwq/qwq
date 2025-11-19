@@ -89,42 +89,49 @@ const ask = (args: string[]) =>
     Effect.gen(function* () {
         const config = yield* getConfig()
         const envVars = getEnvVars(config.env_access.env_vars)
-        const question = argsToText(args)
+        const shell = pipe(args.slice(0, 1), argsToShellName)
+        const question = pipe(args.slice(1), argsToText)
         return yield* config.debug
             ? askDebug(envVars)(question)
-            : askAi(config)(envVars)(question)
+            : askAi(config)(envVars)(shell)(question)
     })
 
 const askDebug = (envVars: EnvVar[]) => (question: string) =>
     pipe(buildDummyAnswer(buildEnvVarsPart(envVars))(question), Console.log)
 
-const askAi = (config: Config) => (envVars: EnvVar[]) => (question: string) =>
-    Effect.gen(function* () {
-        const cache = config.memory.enable ? yield* getCache() : []
-        const req = buildRequest(config.api)(cache)(envVars)(question)
-        const res = yield* makeRequest(config.api.url)(req)
-        const resText = yield* responseText(res)
-        const resJson = yield* json2Data(resText)
-        const ans = yield* Match.value(config.api.type).pipe(
-            Match.when("anthropic", _ => parseResponseAnthropic(resJson)),
-            Match.when("openai", _ => parseResponseOpenai(resJson)),
-            Match.exhaustive,
-        )
-        if (config.memory.enable) {
-            const curQa = [
-                {
-                    role: "user",
-                    content: question,
-                },
-                {
-                    role: "assistant",
-                    content: ans,
-                },
-            ] as Message[]
-            yield* updateCache(config.memory.length)(curQa)
-        }
-        yield* Console.log(ans)
-    })
+const askAi =
+    (config: Config) =>
+    (envVars: EnvVar[]) =>
+    (shell: string) =>
+    (question: string) =>
+        Effect.gen(function* () {
+            const cache = config.memory.enable ? yield* getCache() : []
+            const req = buildRequest(config.api)(envVars)(shell)(cache)(
+                question,
+            )
+            const res = yield* makeRequest(config.api.url)(req)
+            const resText = yield* responseText(res)
+            const resJson = yield* json2Data(resText)
+            const ans = yield* Match.value(config.api.type).pipe(
+                Match.when("anthropic", _ => parseResponseAnthropic(resJson)),
+                Match.when("openai", _ => parseResponseOpenai(resJson)),
+                Match.exhaustive,
+            )
+            if (config.memory.enable) {
+                const curQa = [
+                    {
+                        role: "user",
+                        content: question,
+                    },
+                    {
+                        role: "assistant",
+                        content: ans,
+                    },
+                ] as Message[]
+                yield* updateCache(config.memory.length)(curQa)
+            }
+            yield* Console.log(ans)
+        })
 
 const getConfig = () =>
     Effect.succeed(`${getWorkingDir()}/config.yaml`).pipe(
@@ -176,11 +183,12 @@ const updateCache = (length: number) => (msgs: Message[]) =>
 
 const buildRequest =
     (configApi: ConfigApi) =>
-    (cache: readonly Message[]) =>
     (envVars: EnvVar[]) =>
+    (shell: string) =>
+    (cache: readonly Message[]) =>
     (question: string) =>
         pipe(
-            buildRequestBody(configApi.model)(cache)(envVars)(question),
+            buildRequestBody(configApi.model)(envVars)(shell)(cache)(question),
             data2Json,
             body =>
                 ({
@@ -198,21 +206,25 @@ const buildRequestHead = (apiKey: string) =>
 
 const buildRequestBody =
     (model: string) =>
-    (cache: readonly Message[]) =>
     (envVars: EnvVar[]) =>
+    (shell: string) =>
+    (cache: readonly Message[]) =>
     (question: string) =>
         ({
             model,
             enable_thinking: false,
-            messages: buildMessages(cache)(envVars)(question),
+            messages: buildMessages(cache)(envVars)(shell)(question),
         }) as RequestBoby
 
 const buildMessages =
-    (cache: readonly Message[]) => (envVars: EnvVar[]) => (question: string) =>
+    (cache: readonly Message[]) =>
+    (envVars: EnvVar[]) =>
+    (shell: string) =>
+    (question: string) =>
         [
             {
                 role: "system",
-                content: buildSystemPrompt(envVars),
+                content: buildSystemPrompt(envVars)(shell),
             },
             ...cache,
             {
@@ -221,8 +233,8 @@ const buildMessages =
             },
         ] as Message[]
 
-const buildSystemPrompt = (envVars: EnvVar[]) =>
-    pipe(envVars, buildEnvVarsPart, buildSysPrompt)
+const buildSystemPrompt = (envVars: EnvVar[]) => (shell: string) =>
+    pipe(envVars, buildEnvVarsPart, buildSysPrompt)(shell)
 
 const buildEnvVarsPart = (envVars: EnvVar[]) =>
     envVars.map(envVar => `${envVar.name}: ${envVar.value}`).join("\n")

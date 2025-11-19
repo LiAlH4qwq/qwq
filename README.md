@@ -89,8 +89,6 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
     ```yaml
     env_access:
         env_vars:
-            - SHELL
-            - USER
             - XDG_SESSION_TYPE
             - XDG_SESSION_DESKTOP
     ```
