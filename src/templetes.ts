@@ -34,17 +34,19 @@ ${qwqCmdEndId}
 
 当前 Shell：
 ${shellName}
-（正常情况下只能为 posixshell、fishshell、powershell 中的一种，若出现其它值，并且无法从用户说的话等其它方面推断出用户使用的 Shell，则可拒绝提供指令建议）
+（只能为 Posixshell、Fishshell、Powershell中的一种，<undefined> 代表错误，若出现错误，并且无法从用户说的话等其它方面推断出用户使用的 Shell，则可拒绝提供指令建议）
 
 环境变量：
 ${envVarsPart}
 `.trim()
 
-export const buildDummyAnswer = (envVarsPart: string) => (question: string) =>
-    `
+export const buildDummyAnswer =
+    (envVarsPart: string) => (shellName: string) => (question: string) =>
+        `
 现在是调试模式喵~
 就是……不会真正向AI提问的
 你提出的问题是：${question}
+你当前使用的Shell是：${shellName}
 我在调试模式下回答不了呢
 把配置文件里的debug改成false就能关掉调试模式了喵
 以下是你的环境变量~
@@ -52,8 +54,8 @@ ${envVarsPart}
 下面是一条指令建议的实例，用于测试shell集成是否正常喵
 ${qwqCmdBeginId}
 ls
-uname -a
 ls /
+uname -a
 cat /etc/os-release
 ${qwqCmdEndId}
 `.trim()
@@ -82,7 +84,7 @@ function qwq {
             : `
     Push-Location ${path}`
     }
-    $answer = (${startCmd} ask powershell $Args | Out-String).Trim()
+    $answer = (${startCmd} ask Powershell $Args | Out-String).Trim()
     $isCmdExists = (${startCmd} check-cmd-exist $answer | Out-String).Trim()
     $text = (${startCmd} extract-text $answer | Out-String).Trim()
     Write-Host ""
@@ -145,7 +147,7 @@ function qwq
             : `
     pushd ${path}`
     }
-    set -l answer (${startCmd} ask fishShell $argv | string collect -a | string trim | string collect -a)
+    set -l answer (${startCmd} ask FishShell $argv | string collect -a | string trim | string collect -a)
     set -l isCmdExists (${startCmd} check-cmd-exist $answer | string collect -a | string trim | string collect -a)
     set -l text (${startCmd} extract-text $answer | string collect -a | string trim | string collect -a)
     printf "\\n"
@@ -194,7 +196,7 @@ qwq() {
     _qwq_prevDir="$PWD"
     cd "${path}"`
     }
-    _qwq_answer="$(${startCmd} ask posixshell "$@")"
+    _qwq_answer="$(${startCmd} ask PosixShell "$@")"
     _qwq_isCmdExists="$(${startCmd} check-cmd-exist "$_qwq_answer")"
     _qwq_text="$(${startCmd} extract-text "$_qwq_answer")"
     printf "\\\\n"

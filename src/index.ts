@@ -65,7 +65,7 @@ Usage: <startCmd> <ask | extract-text | extract-cmd | check-cmd-exist | integrat
 const integrateShell = (args: string[]) =>
     pipe(
         buildShellFunc(getIsExeFile())(getExePathOrSrcDir())(
-            argsToShellName(args),
+            text2ShellType(args.at(0)),
         ),
         Console.log,
     )
@@ -89,15 +89,18 @@ const ask = (args: string[]) =>
     Effect.gen(function* () {
         const config = yield* getConfig()
         const envVars = getEnvVars(config.env_access.env_vars)
-        const shell = pipe(args.slice(0, 1), argsToShellName)
+        const shell = pipe(args.at(0), text2ShellName)
         const question = pipe(args.slice(1), argsToText)
         return yield* config.debug
-            ? askDebug(envVars)(question)
+            ? askDebug(envVars)(shell)(question)
             : askAi(config)(envVars)(shell)(question)
     })
 
-const askDebug = (envVars: EnvVar[]) => (question: string) =>
-    pipe(buildDummyAnswer(buildEnvVarsPart(envVars))(question), Console.log)
+const askDebug = (envVars: EnvVar[]) => (shell: string) => (question: string) =>
+    pipe(
+        buildDummyAnswer(buildEnvVarsPart(envVars))(shell)(question),
+        Console.log,
+    )
 
 const askAi =
     (config: Config) =>
@@ -255,9 +258,17 @@ const parseResponseOpenai = (res: unknown) =>
         Effect.mapError(e => `这个服务器答复我看不太懂呢……\n${res}\n${e}`),
     )
 
-const argsToShellName = (args: string[]) => {
-    const text = args.at(0)?.trim().toLowerCase()
-    return text === undefined || text === "" ? "<undefined>" : text
+const text2ShellType = (text: string | undefined) => {
+    const res = text?.trim().toLowerCase()
+    return res === undefined ? "<undefined>" : res
+}
+
+const text2ShellName = (text: string | undefined) => {
+    const res = text?.trim()
+    return res === undefined ||
+        !["Powershell", "FishShell", "PosixShell"].includes(res)
+        ? "<undefined>"
+        : res
 }
 
 const argsToText = (args: string[]) => args.join(" ").trim()
