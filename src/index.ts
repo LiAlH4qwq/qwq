@@ -65,8 +65,8 @@ Usage: <startCmd> <ask | extract-text | extract-cmd | check-cmd-exist | integrat
 const integrateShell = (args: string[]) =>
     pipe(
         buildShellFunc(getIsExeFile())(getExePathOrSrcDir())(
-            text2ShellType(args.at(0)),
-        ),
+            args.at(1) ?? "qwq",
+        )(text2ShellType(args.at(0))),
         Console.log,
     )
 

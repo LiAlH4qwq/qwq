@@ -61,22 +61,32 @@ ${qwqCmdEndId}
 `.trim()
 
 export const buildShellFunc =
-    (isExeFile: boolean) => (path: string) => (shell: string) => {
+    (isExeFile: boolean) =>
+    (path: string) =>
+    (funcName: string) =>
+    (shell: string) => {
         const startCmd = isExeFile ? path : "bun --silent start"
         return Match.value(shell).pipe(
             Match.when("powershell", _ =>
-                buildPsFunc(isExeFile)(path)(startCmd),
+                buildPsFunc(isExeFile)(path)(startCmd)(funcName),
             ),
-            Match.when("fish", _ => buildFishFunc(isExeFile)(path)(startCmd)),
-            Match.when("sh", _ => buildShFunc(isExeFile)(path)(startCmd)),
+            Match.when("fish", _ =>
+                buildFishFunc(isExeFile)(path)(startCmd)(funcName),
+            ),
+            Match.when("sh", _ =>
+                buildShFunc(isExeFile)(path)(startCmd)(funcName),
+            ),
             Match.orElse(s => `暂时还不支持${s}喵~`),
         )
     }
 
 const buildPsFunc =
-    (isExeFile: boolean) => (path: string) => (startCmd: string) =>
+    (isExeFile: boolean) =>
+    (path: string) =>
+    (startCmd: string) =>
+    (funcName: string) =>
         `
-function qwq {
+function ${funcName} {
     Write-Host -NoNewline "在想呢……"\
     ${
         isExeFile
@@ -137,9 +147,12 @@ function qwq {
 `.trim()
 
 const buildFishFunc =
-    (isExeFile: boolean) => (path: string) => (startCmd: string) =>
+    (isExeFile: boolean) =>
+    (path: string) =>
+    (startCmd: string) =>
+    (funcName: string) =>
         `
-function qwq
+function ${funcName}
     printf "在想呢……"\
     ${
         isExeFile
@@ -185,37 +198,40 @@ end
 `.trim()
 
 const buildShFunc =
-    (isExeFile: boolean) => (path: string) => (startCmd: string) =>
+    (isExeFile: boolean) =>
+    (path: string) =>
+    (startCmd: string) =>
+    (funcName: string) =>
         `
-qwq() {
+${funcName}() {
     printf "在想呢……"\
     ${
         isExeFile
             ? ""
             : `
-    _qwq_prevDir="$PWD"
+    _${funcName}_prevDir="$PWD"
     cd "${path}"`
     }
-    _qwq_answer="$(${startCmd} ask PosixShell "$@")"
-    _qwq_isCmdExists="$(${startCmd} check-cmd-exist "$_qwq_answer")"
-    _qwq_text="$(${startCmd} extract-text "$_qwq_answer")"
+    _${funcName}_answer="$(${startCmd} ask PosixShell "$@")"
+    _${funcName}_isCmdExists="$(${startCmd} check-cmd-exist "$_${funcName}_answer")"
+    _${funcName}_text="$(${startCmd} extract-text "$_${funcName}_answer")"
     printf "\\\\n"
-    if [ "$_qwq_isCmdExists" = "true" ]
+    if [ "$_${funcName}_isCmdExists" = "true" ]
     then
-        _qwq_cmd="$(${startCmd} extract-cmd "$_qwq_answer")"
-        printf "%s\\\\n" "$_qwq_text"
+        _${funcName}_cmd="$(${startCmd} extract-cmd "$_${funcName}_answer")"
+        printf "%s\\\\n" "$_${funcName}_text"
         printf "\\\\n"
         printf "要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~\\\\n"
-        printf "%s\\\\n" "$_qwq_cmd"
+        printf "%s\\\\n" "$_${funcName}_cmd"
         printf "\\\\n"
         while true
         do
             printf "你的选择："
-            read -r _qwq_choice
-            case "$_qwq_choice" in
+            read -r _${funcName}_choice
+            case "$_${funcName}_choice" in
                 (y|yes|Y|Yes|YES)
                     printf "好耶！\\\\n"
-                    eval "$_qwq_cmd"
+                    eval "$_${funcName}_cmd"
                     break
                     ;;
                 (n|no|N|No|NO|"")
@@ -228,13 +244,13 @@ qwq() {
             esac
         done
     else
-        printf "%s\\\\n" "$_qwq_text"
+        printf "%s\\\\n" "$_${funcName}_text"
     fi\
     ${
         isExeFile
             ? ""
             : `
-    cd "$_qwq_prevDir"`
+    cd "$_${funcName}_prevDir"`
     }
 }
 `.trim()
