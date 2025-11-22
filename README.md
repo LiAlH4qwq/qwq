@@ -1,34 +1,35 @@
 # QwQ
 
-命令行中的AI伴侣！
+与终端无缝集成的 AI 助理
 
-## 她可以……
+## 特性
 
-### 聊天
-
-```text
-lialh4@LiAlH4-Laptop ~> qwq 请问你喜欢吃什么呀？
-在想呢……
-(开心地笑) 我最喜欢吃草莓蛋糕啦~软软的奶油配酸甜草莓最棒了！
-```
-
-### 帮忙查询指令
+### 问答
 
 ```text
-lialh4@LiAlH4-Laptop ~> qwq 请问我应该怎么查看系统内核信息呀？
-在想呢……
-（歪头思考）最简单的办法是用uname命令哦！
+lialh4@lialh4-pc /m/h/l/P/qwq (main)> qwq deepseek和qwen是什么
+请稍候……
+DeepSeek和Qwen都是大型语言模型。
 
-要运行这些指令吗？输入 y 确认，输入 n 或者直接按回车取消~
-uname -a
-你的选择：y
-好耶！
-Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 10:20:07 UTC 2025 (b00eabe) x86_64 x86_64 x86_64 GNU/Linux
+DeepSeek由深度求索公司开发，Qwen由阿里巴巴开发。它们都能理解和生成自然语言。
 ```
 
-还有更多哦
+### 指令建议
 
-## 怎么安装呢？
+```text
+lialh4@lialh4-pc /m/h/l/P/qwq (main)> qwq 我的内核版本是什么
+请稍候……
+你可以用 uname -r 命令查看内核版本。
+
+是否运行以上指令？输入 y 确认，输入 n 或直接回车取消。
+uname -r
+
+请选择：y
+正在准备运行……
+6.17.7-200.fc42.x86_64
+```
+
+## 安装
 
 ### 二进制安装
 
@@ -64,11 +65,11 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
     > cp config.example.yaml config.yaml
 
-## 配置怎么办呢？
+## 配置
 
 1. 填写配置文件中的 API TYPE、API URL 和 API KEY (Token) 以及模型选择部分
 
-    目前理论上支持所有兼容 Antoropic 或 OpenAI 格式的 API，但目前只测试了 [硅基流动](https://siliconflow.cn/) 和 Ollama
+    目前理论上支持所有兼容 Antoropic 或 OpenAI 格式的 API。
 
     例如：
 
@@ -93,7 +94,7 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
             - XDG_SESSION_DESKTOP
     ```
 
-## 别忘了启用 Shell 集成~
+## 启用 Shell 集成
 
 请在二进制文件所在目录或克隆的项目目录中执行下文中的操作
 
@@ -127,15 +128,15 @@ Linux LiAlH4-Laptop 6.12.0-160000.20-default #1 SMP PREEMPT_DYNAMIC Mon Jul 21 1
 
 > <启动指令> integrate-shell sh
 
-## 然后……
+## 开始使用
 
-然后就可以在命令行中输入 `qwq <想问的东西>` 来对话啦！
+在终端中输入 `qwq <问题>` 即可对话。
 
-## 画大饼（bushi）
+## 未来展望
 
 - [x] 支持常见 API 格式
 - [x] 支持获取系统环境变量信息
 - [x] 支持记忆（连续对话）功能
 - [x] 支持 POSIX SHELL (Bash、Zsh、etc...) 集成
-- [ ] 支持推理模型
-- [ ] 支持图文生文模型
+- [ ] 支持多语言
+- [ ] 支持视觉模型

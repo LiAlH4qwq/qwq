@@ -55,10 +55,7 @@ const main = (args: string[]) => {
 const showHelp = () =>
     Console.log(
         `
-不推荐直接使用这个二进制文件呢，建议根据文档配置 shell 集成喵
-不过如果要直接使用的话，这是帮助：
 Usage: <startCmd> <ask | extract-text | extract-cmd | check-cmd-exist | integrate-shell> <restArgs...>
-嘛~ 不想写帮助了 pwq
 `.trim(),
     )
 
@@ -143,7 +140,7 @@ const getConfig = () =>
         Effect.flatMap(Schema.decodeUnknown(ConfigS)),
         Effect.mapError(
             e =>
-                `啊，配置文件好像有问题呢，要不查下文档看下怎么配置喵：
+                `配置文件有误，请查阅文档重新配置：
 ${typeof e === "string" ? e : ParseResult.TreeFormatter.formatErrorSync(e)}`,
         ),
     )
@@ -159,7 +156,7 @@ const getCache = () =>
         return yield* fileText(cacheFile).pipe(
             Effect.flatMap(hxqa2Msgs),
             Effect.tapError(e =>
-                Console.log(`啊，缓存文件疑似损坏了，我就清空缓存啦：\n${e}`),
+                Console.log(`缓存文件损坏，已清空缓存：\n${e}`),
             ),
             Effect.orElse(() => writeFile(cacheFile)("").pipe(Effect.as([]))),
         )
@@ -176,7 +173,7 @@ const updateCache = (length: number) => (msgs: Message[]) =>
         const cache = yield* fileText(cacheFile).pipe(
             Effect.flatMap(hxqa2Msgs),
             Effect.tapError(e =>
-                Console.log(`啊，缓存文件疑似损坏了，我就清空缓存啦：\n${e}`),
+                Console.log(`缓存文件损坏，已清空缓存：\n${e}`),
             ),
             Effect.orElse(() => writeFile(cacheFile)("").pipe(Effect.as([]))),
         )
@@ -247,7 +244,7 @@ const parseResponseAnthropic = (res: unknown) =>
         Effect.map(val => val.content.at(0)!.text),
         Effect.map(processAnsText),
         Effect.mapError(ParseResult.TreeFormatter.formatErrorSync),
-        Effect.mapError(e => `这个服务器答复我看不太懂呢……\n${res}\n${e}`),
+        Effect.mapError(e => `解析服务器应答时出现错误：\n${res}\n${e}`),
     )
 
 const parseResponseOpenai = (res: unknown) =>
@@ -255,7 +252,7 @@ const parseResponseOpenai = (res: unknown) =>
         Effect.map(val => val.choices.at(0)!.message.content),
         Effect.map(processAnsText),
         Effect.mapError(ParseResult.TreeFormatter.formatErrorSync),
-        Effect.mapError(e => `这个服务器答复我看不太懂呢……\n${res}\n${e}`),
+        Effect.mapError(e => `解析服务器应答时出现错误：\n${res}\n${e}`),
     )
 
 const text2ShellType = (text: string | undefined) => {
@@ -305,8 +302,7 @@ const fileFromPath = (path: string) => Bun.file(path)
 
 const fileExist = (file: Bun.BunFile) => Effect.promise(() => file.exists())
 
-// 如果文件存在但是没有权限读写，进程也是会直接崩溃的
-// 所以 Effect.try 没有意义 qeq
+// 若无权限读取目标文件，进程会直接崩溃，无法被 try 捕获。
 
 const fileText = (file: Bun.BunFile) =>
     fileExist(file).pipe(
@@ -336,7 +332,7 @@ const hxqa2Msgs = (hxqa: string) =>
         Effect.map(jsonlLine => jsonlLine.messages),
     )
 
-// Bun 的 fetch 就算出错也是没法捕获的 pwq
+// fetch 错误无法被 try 捕获。
 
 const makeRequest = (url: string) => (data: Request) =>
     Effect.promise(() => fetch(url, data as unknown as Record<string, string>))
@@ -354,10 +350,6 @@ const hxqaResult2Effect = (
         ? Effect.succeed(res.value)
         : Effect.fail(pipe(res.error, data2JsonPretty))
 
-// 啊，Bun 上的 Bun.YAML.parse 和 JSON.parse 的错误能捕获
-// 但没法访问到任何错误信息
-// 所以只能返回一个很模糊的错误信息了
-
 const yaml2Data = (yaml: string) =>
     Effect.try({
         try: () => Bun.YAML.parse(yaml),
@@ -370,8 +362,7 @@ const json2Data = (json: string) =>
         catch: _ => "CouldntParseJson",
     })
 
-// 呐，在 Bun 上，JSON.stringify 的错误是没法被 try 捕获的
-// 所以这两个函数就不用 Effect.try 啦
+// 此错误无法被 try 捕获。
 
 const data2JsonPretty = (data: unknown) => JSON.stringify(data, undefined, 2)
 
@@ -379,6 +370,6 @@ const data2Json = (data: unknown) => JSON.stringify(data)
 
 if (import.meta.main)
     main(Bun.argv.slice(2)).pipe(
-        Effect.catchAll(e => Console.log("好像出错了呢：\n", e)),
+        Effect.catchAll(e => Console.log("出现了错误：\n", e)),
         Effect.runFork,
     )
