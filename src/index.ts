@@ -15,6 +15,7 @@ import {
     getIsExeFile,
     getWorkingDir,
 } from "./env"
+import { AppLive, Files, Http, Runtime } from "./layers"
 import {
     buildDummyAnswer,
     buildShellFunc,
@@ -60,12 +61,17 @@ Usage: <startCmd> <ask | extract-text | extract-cmd | check-cmd-exist | integrat
     )
 
 const integrateShell = (args: string[]) =>
-    pipe(
-        buildShellFunc(getIsExeFile())(getExePathOrSrcDir())(
-            args.at(1) ?? "qwq",
-        )(text2ShellType(args.at(0))),
-        Console.log,
-    )
+    Effect.gen(function* () {
+        const runtime = yield* Runtime
+        yield* Effect.sync(() =>
+            pipe(
+                buildShellFunc(getIsExeFile(runtime))(
+                    getExePathOrSrcDir(runtime),
+                )(args.at(1) ?? "qwq")(text2ShellType(args.at(0))),
+                Console.log,
+            ),
+        )
+    })
 
 const checkCmdExist = (args: string[]) =>
     pipe(
@@ -85,7 +91,8 @@ const extractCommand = (args: string[]) =>
 const ask = (args: string[]) =>
     Effect.gen(function* () {
         const config = yield* getConfig()
-        const envVars = getEnvVars(config.env_access.env_vars)
+        const runtime = yield* Runtime
+        const envVars = getEnvVars(runtime)(config.env_access.env_vars)
         const shell = pipe(args.at(0), text2ShellName)
         const question = pipe(args.slice(1), argsToText)
         return yield* config.debug
@@ -134,20 +141,28 @@ const askAi =
         })
 
 const getConfig = () =>
-    Effect.succeed(`${getWorkingDir()}/config.yaml`).pipe(
-        Effect.flatMap(readFile),
-        Effect.flatMap(yaml2Data),
-        Effect.flatMap(Schema.decodeUnknown(ConfigS)),
-        Effect.mapError(
-            e =>
-                `配置文件有误，请查阅文档重新配置：
+    Effect.gen(function* () {
+        const runtime = yield* Runtime
+        return yield* Effect.succeed(
+            `${getWorkingDir(runtime)}/config.yaml`,
+        ).pipe(
+            Effect.flatMap(readFile),
+            Effect.flatMap(yaml2Data),
+            Effect.flatMap(Schema.decodeUnknown(ConfigS)),
+            Effect.mapError(
+                e =>
+                    `配置文件有误，请查阅文档重新配置：
 ${typeof e === "string" ? e : ParseResult.TreeFormatter.formatErrorSync(e)}`,
-        ),
-    )
+            ),
+        )
+    })
 
 const getCache = () =>
     Effect.gen(function* () {
-        const cacheFile = fileFromPath(`${getWorkingDir()}/cache.hxqa`)
+        const runtime = yield* Runtime
+        const cacheFile = yield* fileFromPath(
+            `${getWorkingDir(runtime)}/cache.hxqa`,
+        )
         const exists = yield* fileExist(cacheFile)
         if (!exists) {
             yield* writeFile(cacheFile)("")
@@ -165,7 +180,10 @@ const getCache = () =>
 const updateCache = (length: number) => (msgs: Message[]) =>
     Effect.gen(function* () {
         if (msgs.length <= 0) return
-        const cacheFile = fileFromPath(`${getWorkingDir()}/cache.hxqa`)
+        const runtime = yield* Runtime
+        const cacheFile = yield* fileFromPath(
+            `${getWorkingDir(runtime)}/cache.hxqa`,
+        )
         if (msgs.at(-1)!.content === qwqMetaTermMsg) {
             yield* writeFile(cacheFile)("")
             return
@@ -298,7 +316,8 @@ const splitCmd = (ans: string) =>
         ? ans.split(qwqCmdBeginId).at(-1)!.split(qwqCmdEndId).at(0)!.trim()
         : ""
 
-const fileFromPath = (path: string) => Bun.file(path)
+const fileFromPath = (path: string) =>
+    Effect.map(Files, files => files.file(path))
 
 const fileExist = (file: Bun.BunFile) => Effect.promise(() => file.exists())
 
@@ -313,10 +332,10 @@ const fileText = (file: Bun.BunFile) =>
         ),
     )
 
-const readFile = (path: string) => pipe(path, fileFromPath, fileText)
+const readFile = (path: string) => Effect.flatMap(fileFromPath(path), fileText)
 
 const writeFile = (pathOrFile: string | Bun.BunFile) => (data: string) =>
-    Effect.promise(() => Bun.write(pathOrFile, data))
+    Effect.flatMap(Files, files => files.write(pathOrFile, data))
 
 const msgs2Hxqa = (msgs: Message[]) =>
     Effect.succeed(msgs).pipe(
@@ -335,7 +354,16 @@ const hxqa2Msgs = (hxqa: string) =>
 // fetch 错误无法被 try 捕获。
 
 const makeRequest = (url: string) => (data: Request) =>
-    Effect.promise(() => fetch(url, data as unknown as Record<string, string>))
+    Effect.flatMap(Http, http =>
+        http.request(url, {
+            method: data.method,
+            headers: {
+                Authorization: data.headers.Authorization,
+                "Content-Type": data.headers["Content-Type"],
+            },
+            body: data.body,
+        }),
+    )
 
 const responseText = (res: Response) => Effect.promise(() => res.text())
 
@@ -371,5 +399,6 @@ const data2Json = (data: unknown) => JSON.stringify(data)
 if (import.meta.main)
     main(Bun.argv.slice(2)).pipe(
         Effect.catchAll(e => Console.log("出现了错误：\n", e)),
+        Effect.provide(AppLive),
         Effect.runFork,
     )
