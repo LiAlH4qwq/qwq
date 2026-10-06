@@ -1,0 +1,19 @@
+{
+  "name": "@qwq/command",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "qwq-command: shell integration client",
+  "bin": {
+    "qwq-command": "./dist/qwq-command.js"
+  },
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "rm -rf dist && rolldown -c rolldown.config.ts"
+  },
+  "dependencies": {
+    "@qwq/shared": "workspace:*"
+  }
+}

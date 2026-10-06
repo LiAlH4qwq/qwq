@@ -1,0 +1,19 @@
+{
+  "name": "@qwq/tui",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "qwq-tui: full-screen terminal interface (ink/React)",
+  "bin": {
+    "qwq-tui": "./dist/qwq-tui.js"
+  },
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "rm -rf dist && rolldown -c rolldown.config.ts"
+  },
+  "dependencies": {
+    "@qwq/shared": "workspace:*"
+  }
+}

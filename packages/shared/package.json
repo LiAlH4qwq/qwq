@@ -1,0 +1,10 @@
+{
+  "name": "@qwq/shared",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared domain types, config schema, RPC contract and client for qwq",
+  "exports": {
+    "./*": "./src/*.ts"
+  }
+}

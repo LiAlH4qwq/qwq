@@ -1,0 +1,14 @@
+[book]
+title = "qwq"
+authors = ["LiAlH4qwq"]
+language = "zh"
+src = "."
+
+[build]
+build-dir = "book"
+
+[output.html]
+site-url = "/qwq/zh/"
+git-repository-url = "https://github.com/LiAlH4qwq/qwq"
+edit-url-template = "https://github.com/LiAlH4qwq/qwq/edit/main/docs/zh/{path}"
+additional-js = ["theme/lang.js"]

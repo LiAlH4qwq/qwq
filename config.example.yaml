@@ -1,34 +1,177 @@
-# 调试模式开关
+# 调试模式：为 true 时不向 AI API 发送请求，仅用于测试 Shell 集成
 debug: false
 
-# Anthropic 兼容 API 示例
+# AI API（兼容 Anthropic 或 OpenAI 格式）
 api:
-    type: anthropic
-    url: https://api.siliconflow.cn/v1/messages
-    key: YOUR_API_TOKEN
+    # anthropic 或 openai
+    type: openai
+    url: https://api.siliconflow.cn/v1/chat/completions
     model: deepseek-ai/DeepSeek-V3
+    # 二选一：直接填写 key，或改用 keyEnv 从环境变量读取（推荐，避免明文）
+    key: YOUR_API_TOKEN
+    # keyEnv: QWQ_API_KEY
+    # 流式回复（opt-out，默认开启）；设为 false 可关闭
+    stream: true
 
-# OpenAI 兼容 API 示例
+# Anthropic 兼容 API 示例
 # api:
-#    type: openai
-#    url: https://api.siliconflow.cn/v1/chat/completions
-#    key: YOUR_API_TOKEN
-#    model: deepseek-ai/DeepSeek-V3
+#     type: anthropic
+#     url: https://api.siliconflow.cn/v1/messages
+#     key: YOUR_API_TOKEN
+#     model: deepseek-ai/DeepSeek-V3
 
 # Ollama API 示例（同 OpenAI）
 # api:
-#    type: openai
-#    url: http://localhost:11434/v1/chat/completions
-#    key: YOUR_API_TOKEN
-#    model: qwen2.5:latest
+#     type: openai
+#     url: http://localhost:11434/v1/chat/completions
+#     key: unused
+#     model: qwen2.5:latest
 
-# 上下文记忆功能
-memory:
-    enable: true
-    length: 10
+# 会话：多会话、标题与自动压缩
+sessions:
+    # 会话 JSON 存放目录；留空表示 ./sessions
+    dir: ""
+    # 语音 / 命令补全会话在该时间窗内再次使用时复用，超过则新建（分钟）
+    reuseMinutes: 1
+    # 会话标题：优先调用模型生成「前端：主题」，失败时回退为首条消息，再回退为「前端：时间」
+    title:
+        enable: true # opt-out
+        maxChars: 20
+    # 自动压缩：超过 maxChars 时用模型摘要较早对话，只保留最近 keepRecent 条
+    compact:
+        enable: true
+        maxChars: 48000
+        keepRecent: 16
 
-# 允许访问的环境变量
-env_access:
-    env_vars:
+# 允许 AI 读取的环境变量
+envAccess:
+    envVars:
+        - SHELL
+        - USER
         - XDG_SESSION_TYPE
         - XDG_SESSION_DESKTOP
+
+# 服务端：供命令行、语音与未来的 GUI 前端连接
+server:
+    host: 127.0.0.1
+    port: 8787
+
+# 提示词：模块化（common/command/voice/chat/agent）+ 预设（default/kawaii），可按需覆盖
+prompts:
+    preset: default
+    modules: {}
+    # modules:
+    #     common: "你是一位……"
+    #     command: "……"
+    #     voice: "……"
+    #     chat: "……"
+    #     agent: "……"
+
+# 语音合成（TTS）：默认不合成；engine 设为 piper 并配置模型即可启用
+tts:
+    enable: true
+    engine: none # none | piper | command
+    binary: piper
+    model: /var/lib/qwq/tts/zh_CN-huayan-medium.onnx
+    speed: 1.0
+    player: pw-play
+    # onnxruntime 执行后端，仅传给支持 --provider 的 TTS 程序（如 sherpa-onnx）；
+    # 留空则不传（piper 默认）。performance 档会由 voice.accel 自动填充。
+    provider: ""
+    # command: "edge-tts --file {in} --write-media {out}"
+
+# 图形化前端（Electron）：回复弹窗 + 聊天窗口
+gui:
+    enable: true
+    tray: true # 注册系统托盘
+    popupDurationMs: 10000 # 回复弹窗时长（毫秒）
+    theme: light # light | dark
+    popup: voice # 弹窗来源：voice（仅语音，默认）| all | none
+
+# 工具调用：让助手自行执行命令与读写文件（命令行、语音、GUI 前端都会走智能体循环）
+tools:
+    enable: true
+    mode: auto # auto（执行）| off（只建议，不执行）
+    native: auto # auto | on | off（是否尝试原生工具调用；不支持则回退文本命令块）
+    shell: "" # 默认 bash；可指定 /bin/sh 等
+    workingDir: "" # 默认服务端工作目录
+    timeoutMs: 30000
+    maxSteps: 8
+    maxOutputBytes: 20000
+    blacklist: [] # 追加危险命令黑名单（内置默认始终生效）
+    # 风险操作确认：mode=ask 时由前端弹窗确认；auto 自动允许；deny 直接拒绝。
+    # 非交互式 qwq-cli 默认自动拒绝（可用 --permission auto 覆盖）。
+    permission:
+        mode: ask # ask | auto | deny
+        allow: [] # 命中这些正则的命令无需确认，例如 ["^ls\\b", "^cat\\b"]
+        timeoutMs: 60000 # 等待前端确认的超时（毫秒），超时按拒绝处理
+
+# 语音助手（可选；不需要 `qwq voice` 时可整段删除）
+voice:
+    # 音频采集：auto 会依次探测 pw-record / parec / arecord
+    audio:
+        backend: auto # auto | pipewire | pulse | alsa
+        device: ""
+        sampleRate: 16000
+        # 使用 PipeWire 回声消除源（echo-cancel-source）；需先启用 module-echo-cancel
+        echoCancel: false
+    # 常驻流式唤醒词 worker（Nix 打包为 `qwq-kws`；也可用 command/args 指向自备 Python）
+    wakeWord:
+        command: qwq-kws
+        args: []
+        modelDir: /var/lib/qwq/models/kws
+        # 可选，默认 ${modelDir}/encoder.onnx、decoder.onnx、joiner.onnx
+        # encoder: /var/lib/qwq/models/kws/encoder.onnx
+        # decoder: /var/lib/qwq/models/kws/decoder.onnx
+        # joiner: /var/lib/qwq/models/kws/joiner.onnx
+        keywordsFile: /etc/qwq/keywords.txt
+        keywordsScore: 1.5
+        keywordsThreshold: 0.25
+        provider: cpu
+        numThreads: 1
+    # 大语音识别模型：转写包含唤醒词及其后紧跟的内容
+    asr:
+        binary: sherpa-onnx-offline
+        modelDir: /var/lib/qwq/models/asr
+        # 可选，默认 ${modelDir}/model.onnx
+        # modelFile: /var/lib/qwq/models/asr/model.onnx
+        tokens: ""
+        language: zh
+        numThreads: 2
+        # onnxruntime 执行后端：cpu | cuda | openvino | rocm | …（取决于构建）
+        provider: cpu
+    silenceMs: 800
+    # 唤醒（或回应）后，等待用户开始说话的时长；避免过早停止录音
+    initialSilenceMs: 6000
+    silenceThreshold: 500
+    maxUtteranceMs: 10000
+    preRollMs: 1500
+    # 唤醒后的回应（opt-out，默认开启）；text 为空时用预设默认（default「我在」/ kawaii 对应词）
+    acknowledge: true
+    acknowledgeText: ""
+    # 请求失败时的语音提示（opt-out）；两种失败分别提示，text 为空时用预设默认
+    speakErrors: true
+    asrErrorText: ""
+    llmErrorText: ""
+    # 工具调用语音提示（opt-out）；{name} 会替换为工具名，text 为空时用预设默认
+    speakTools: true
+    toolStartText: ""
+    toolResultText: ""
+    toolDeniedText: ""
+    # 权限询问：语音播报后监听用户的「允许 / 拒绝」，超时按拒绝处理
+    permissionText: ""
+    permissionGrantedText: ""
+    permissionDeniedText: ""
+    permissionTimeoutText: ""
+    # 语音识别出的允许 / 拒绝词（子串匹配，拒绝词优先）；留空使用内置默认
+    permissionAllowWords: []
+    permissionDenyWords: []
+    # 功耗档：battery（默认，常驻唤醒词固定单线程 CPU，最省电）|
+    # balanced（自定义线程，仍走 CPU）| performance（一次性 ASR/TTS 使用加速器）
+    # 插拔电源会自动切换：用电池时强制 battery，接电时使用此处配置。
+    power: battery
+    # 一次性 ASR/TTS 的加速器偏好：auto | cpu | openvino | cuda | rocm | npu。
+    # auto 会在 Linux 上按显卡厂商选择（Intel→openvino、NVIDIA→cuda、AMD→rocm），
+    # 其余情况回退 cpu；常驻唤醒词始终留在 CPU。
+    accel: auto
+

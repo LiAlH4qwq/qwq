@@ -1,31 +1,35 @@
 {
-    "compilerOptions": {
-        "allowUnreachableCode": false,
-        "allowUnusedLabels": false,
-        "exactOptionalPropertyTypes": true,
-        "noFallthroughCasesInSwitch": true,
-        "noImplicitAny": true,
-        "noImplicitOverride": true,
-        "noImplicitReturns": true,
-        "noImplicitThis": true,
-        "noPropertyAccessFromIndexSignature": true,
-        "noUncheckedIndexedAccess": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "strict": true,
-        "noUncheckedSideEffectImports": true,
-        "declaration": true,
-        "emitDeclarationOnly": true,
-        "noEmitOnError": true,
-        "noEmit": true,
-        "allowJs": false,
-        "erasableSyntaxOnly": false,
-        "module": "preserve",
-        "target": "esnext",
-        "outDir": "./dist",
-        "rootDir": "./src",
-        "baseUrl": "./",
-        "paths": {}
-    },
-    "include": ["./src/**/*"]
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@qwq/shared/*": ["packages/shared/src/*"],
+      "@qwq/server/*": ["packages/server/src/*"]
+    }
+  },
+  "include": [
+    "packages",
+    "test",
+    "scripts",
+    "rolldown.gui.config.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["packages/gui"]
 }

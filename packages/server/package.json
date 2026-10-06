@@ -1,0 +1,19 @@
+{
+  "name": "@qwq/server",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "qwq agent server, LLM client, memory store and voice backend",
+  "bin": {
+    "qwq": "./dist/qwq.js"
+  },
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "build": "rm -rf dist && rolldown -c rolldown.config.ts"
+  },
+  "dependencies": {
+    "@qwq/shared": "workspace:*"
+  }
+}
